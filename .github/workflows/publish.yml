@@ -7,6 +7,7 @@ on:
 
 jobs:
   publish-pypi:
+    if: ${{ secrets.PYPI_TOKEN != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +20,7 @@ jobs:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
 
   publish-docker:
+    if: ${{ secrets.DOCKERHUB_USERNAME != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
