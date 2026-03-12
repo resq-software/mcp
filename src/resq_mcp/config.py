@@ -31,7 +31,10 @@ from __future__ import annotations
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from resq.exceptions import ConfigurationError
+
+
+class ConfigurationError(Exception):
+    """Raised when required configuration is missing or invalid."""
 
 
 class Settings(BaseSettings):
