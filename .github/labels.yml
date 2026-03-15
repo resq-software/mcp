@@ -69,6 +69,19 @@
   color: "000000"
   description: "CI/CD and tooling"
 
+# --- Dependency automation ---
+- name: "dependencies"
+  color: "0366d6"
+  description: Automated dependency updates
+
+- name: "github-actions"
+  color: "1f6feb"
+  description: GitHub Actions dependency updates
+
+- name: "python"
+  color: "3572A5"
+  description: Python dependency updates
+
 # --- Status (S-) ---
 - name: "S-Needs-Triage"
   color: "ededed"

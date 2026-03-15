@@ -115,7 +115,7 @@ exclude_lines = [
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
 changelog_file = "CHANGELOG.md"
-build_command = "pip install uv && uv build"
+build_command = "pip install build && python -m build"
 commit_message = "chore(release): {version}"
 
 [tool.semantic_release.commit_parser_options]
