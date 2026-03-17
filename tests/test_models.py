@@ -328,7 +328,11 @@ class TestModelsPropertyBased:
         req = DeploymentRequest(sector_id="Sector-1", priority=priority)
         assert req.priority == priority
 
-    @given(priority=st.text(min_size=1).filter(lambda x: x not in {"low", "medium", "high", "critical"}))
+    @given(
+        priority=st.text(min_size=1).filter(
+            lambda x: x not in {"low", "medium", "high", "critical"}
+        )
+    )
     @hyp_settings(max_examples=20)
     def test_deployment_request_rejects_invalid_priorities(self, priority: str) -> None:
         with pytest.raises(ValidationError):
@@ -337,16 +341,24 @@ class TestModelsPropertyBased:
     @given(source=st.sampled_from(["edge_ai", "human_report", "sensor_network"]))
     def test_incident_report_valid_sources(self, source: str) -> None:
         report = IncidentReport(
-            incident_id="INC-HYP", source=source, sector_id="Sector-1",
-            detected_type="test", confidence=0.5,
+            incident_id="INC-HYP",
+            source=source,
+            sector_id="Sector-1",
+            detected_type="test",
+            confidence=0.5,
         )
         assert report.source == source
 
-    @given(confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False))
+    @given(
+        confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
+    )
     def test_incident_report_round_trip(self, confidence: float) -> None:
         report = IncidentReport(
-            incident_id="INC-RT", source="edge_ai", sector_id="Sector-1",
-            detected_type="test", confidence=confidence,
+            incident_id="INC-RT",
+            source="edge_ai",
+            sector_id="Sector-1",
+            detected_type="test",
+            confidence=confidence,
         )
         data = report.model_dump()
         restored = IncidentReport(**data)

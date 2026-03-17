@@ -22,7 +22,10 @@ import json
 class TestMCPErrorFormatter:
     def test_format_basic_error(self) -> None:
         from resq_mcp.errors import MCPErrorFormatter
-        result = MCPErrorFormatter.format_error(error_type="validation_error", message="Sector not found")
+
+        result = MCPErrorFormatter.format_error(
+            error_type="validation_error", message="Sector not found"
+        )
         parsed = json.loads(result)
         assert parsed["success"] is False
         assert parsed["error"]["type"] == "validation_error"
@@ -30,9 +33,12 @@ class TestMCPErrorFormatter:
 
     def test_format_error_with_details_and_suggestion(self) -> None:
         from resq_mcp.errors import MCPErrorFormatter
+
         result = MCPErrorFormatter.format_error(
-            error_type="not_found", message="Simulation SIM-XYZ not found",
-            details={"sim_id": "SIM-XYZ"}, suggestion="Check the simulation ID and try again",
+            error_type="not_found",
+            message="Simulation SIM-XYZ not found",
+            details={"sim_id": "SIM-XYZ"},
+            suggestion="Check the simulation ID and try again",
         )
         parsed = json.loads(result)
         assert parsed["error"]["details"]["sim_id"] == "SIM-XYZ"
@@ -40,7 +46,10 @@ class TestMCPErrorFormatter:
 
     def test_format_error_without_optionals(self) -> None:
         from resq_mcp.errors import MCPErrorFormatter
-        result = MCPErrorFormatter.format_error(error_type="internal_error", message="Something went wrong")
+
+        result = MCPErrorFormatter.format_error(
+            error_type="internal_error", message="Something went wrong"
+        )
         parsed = json.loads(result)
         assert "details" not in parsed["error"]
         assert "suggestion" not in parsed["error"]
@@ -48,6 +57,7 @@ class TestMCPErrorFormatter:
 
     def test_from_exception(self) -> None:
         from resq_mcp.errors import MCPErrorFormatter
+
         try:
             raise ValueError("Invalid sector_id format")
         except ValueError as e:

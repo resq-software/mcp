@@ -81,6 +81,7 @@ class TestVerifyApiKey:
 
     def test_empty_bearer_value_raises_403(self) -> None:
         from resq_mcp.security import verify_api_key
+
         request = self._make_request("Bearer ")
         with pytest.raises(HTTPException) as exc_info:
             verify_api_key(request)
@@ -89,6 +90,7 @@ class TestVerifyApiKey:
     def test_multi_space_separator(self) -> None:
         from resq_mcp.config import settings
         from resq_mcp.security import verify_api_key
+
         request = self._make_request(f"Bearer  {settings.API_KEY}")
         with pytest.raises(HTTPException) as exc_info:
             verify_api_key(request)
@@ -96,6 +98,7 @@ class TestVerifyApiKey:
 
     def test_only_scheme_no_space(self) -> None:
         from resq_mcp.security import verify_api_key
+
         request = self._make_request("Bearer")
         with pytest.raises(HTTPException) as exc_info:
             verify_api_key(request)

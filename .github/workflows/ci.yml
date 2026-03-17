@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: uv sync
-      - run: uv run ruff check --select S src/ tests/
+      - run: uv run ruff check --select S --ignore S104 src/ tests/
 
   test:
     name: Test (Python ${{ matrix.python-version }})

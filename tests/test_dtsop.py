@@ -104,7 +104,13 @@ class TestGetOptimizationStrategy:
 class TestEdgeCases:
     def test_simulation_id_format(self) -> None:
         import re
-        req = SimulationRequest(scenario_id="edge-001", sector_id="Sector-1", disaster_type="flood", parameters={"water_level": 0.0})
+
+        req = SimulationRequest(
+            scenario_id="edge-001",
+            sector_id="Sector-1",
+            disaster_type="flood",
+            parameters={"water_level": 0.0},
+        )
         sim_id = run_simulation(req)
         assert re.match(r"^SIM-[A-F0-9]{8}$", sim_id)
 

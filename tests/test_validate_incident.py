@@ -74,7 +74,8 @@ class TestValidateIncident:
     @pytest.mark.asyncio
     async def test_validate_with_correlated_pre_alert(self, caplog: LogCaptureFixture) -> None:
         val = IncidentValidation(
-            incident_id="INC-CORR-003", is_confirmed=True,
+            incident_id="INC-CORR-003",
+            is_confirmed=True,
             validation_source="PDIE-Correlation-Engine",
             correlated_pre_alert_id="PRE-ALERT-789",
             notes="Correlated with predictive alert PRE-ALERT-789",
@@ -86,7 +87,8 @@ class TestValidateIncident:
     @pytest.mark.asyncio
     async def test_validate_with_sensor_network_source(self, caplog: LogCaptureFixture) -> None:
         val = IncidentValidation(
-            incident_id="INC-SENSOR-004", is_confirmed=True,
+            incident_id="INC-SENSOR-004",
+            is_confirmed=True,
             validation_source="Sensor-Network-Validator",
             notes="Multiple ground sensors triggered",
         )
@@ -98,7 +100,8 @@ class TestValidateIncident:
     @pytest.mark.asyncio
     async def test_validate_reject_with_detailed_notes(self, caplog: LogCaptureFixture) -> None:
         val = IncidentValidation(
-            incident_id="INC-FP-005", is_confirmed=False,
+            incident_id="INC-FP-005",
+            is_confirmed=False,
             validation_source="Human-Operator-Bob",
             notes="False positive: construction activity, not fire",
         )
@@ -110,7 +113,8 @@ class TestValidateIncident:
     @pytest.mark.asyncio
     async def test_validate_log_format_contains_all_fields(self, caplog: LogCaptureFixture) -> None:
         val = IncidentValidation(
-            incident_id="INC-LOG-006", is_confirmed=True,
+            incident_id="INC-LOG-006",
+            is_confirmed=True,
             validation_source="Audit-Test-Source",
             notes="Testing log format completeness",
         )

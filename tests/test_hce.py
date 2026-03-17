@@ -169,12 +169,24 @@ class TestUpdateMissionParams:
 
 class TestEdgeCases:
     def test_validate_incident_with_zero_confidence(self) -> None:
-        report = IncidentReport(incident_id="INC-ZERO", source="edge_ai", sector_id="Sector-1", detected_type="test", confidence=0.0)
+        report = IncidentReport(
+            incident_id="INC-ZERO",
+            source="edge_ai",
+            sector_id="Sector-1",
+            detected_type="test",
+            confidence=0.0,
+        )
         result = validate_incident(report)
         assert not result.is_confirmed
 
     def test_validate_incident_with_max_confidence(self) -> None:
-        report = IncidentReport(incident_id="INC-MAX", source="edge_ai", sector_id="Sector-1", detected_type="test", confidence=1.0)
+        report = IncidentReport(
+            incident_id="INC-MAX",
+            source="edge_ai",
+            sector_id="Sector-1",
+            detected_type="test",
+            confidence=1.0,
+        )
         result = validate_incident(report)
         assert result.is_confirmed
 
@@ -190,6 +202,7 @@ class TestEdgeCases:
 
     def test_mission_params_strategy_hash_format(self) -> None:
         import re
+
         params = update_mission_params("DRONE-Z", "STRAT-TEST")
         assert isinstance(params, MissionParameters)
         assert re.match(r"^0x[a-f0-9]{64}$", params.strategy_hash)

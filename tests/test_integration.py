@@ -38,8 +38,12 @@ from resq_mcp.tools import request_drone_deployment, scan_current_sector
 class TestIncidentToMissionFlow:
     def test_confirmed_incident_produces_mission_params(self) -> None:
         report = IncidentReport(
-            incident_id="INC-INTEG-001", source="edge_ai", sector_id="Sector-1",
-            detected_type="wildfire", confidence=0.95, evidence_url="neofs://evidence/fire.mp4",
+            incident_id="INC-INTEG-001",
+            source="edge_ai",
+            sector_id="Sector-1",
+            detected_type="wildfire",
+            confidence=0.95,
+            evidence_url="neofs://evidence/fire.mp4",
         )
         validation = validate_incident(report)
         assert isinstance(validation, IncidentValidation)
@@ -56,8 +60,11 @@ class TestIncidentToMissionFlow:
 
     def test_rejected_incident_does_not_trigger_response(self) -> None:
         report = IncidentReport(
-            incident_id="INC-INTEG-002", source="sensor_network", sector_id="Sector-2",
-            detected_type="flooding", confidence=0.3,
+            incident_id="INC-INTEG-002",
+            source="sensor_network",
+            sector_id="Sector-2",
+            detected_type="flooding",
+            confidence=0.3,
         )
         validation = validate_incident(report)
         assert isinstance(validation, IncidentValidation)
@@ -88,17 +95,26 @@ class TestSimulationLifecycle:
     @pytest.mark.asyncio
     async def test_simulation_end_to_end(self) -> None:
         from fastmcp.exceptions import FastMCPError
+
         from resq_mcp.dtsop import run_simulation
         from resq_mcp.models import SimulationRequest
         from resq_mcp.server import get_simulation_status, simulations
+
         simulations.clear()
 
         request = SimulationRequest(
-            scenario_id="integ-sim-001", sector_id="Sector-1",
-            disaster_type="flood", parameters={"water_level": 3.0}, priority="urgent",
+            scenario_id="integ-sim-001",
+            sector_id="Sector-1",
+            disaster_type="flood",
+            parameters={"water_level": 3.0},
+            priority="urgent",
         )
         sim_id = run_simulation(request)
-        simulations[sim_id] = {"status": "pending", "request": request.model_dump(), "created_at": "now"}
+        simulations[sim_id] = {
+            "status": "pending",
+            "request": request.model_dump(),
+            "created_at": "now",
+        }
 
         status_str = await get_simulation_status(sim_id)
         assert sim_id in status_str

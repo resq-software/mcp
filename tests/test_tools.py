@@ -180,10 +180,12 @@ class TestRequestDroneDeployment:
 class TestProbabilisticBehavior:
     def test_disaster_detection_rate_approximately_30_percent(self) -> None:
         import random
+
         random.seed(42)
         n_runs = 1000
         detections = sum(
-            1 for _ in range(n_runs)
+            1
+            for _ in range(n_runs)
             if isinstance(scan_current_sector("Sector-1"), SectorAnalysis)
             and scan_current_sector("Sector-1").status == "CRITICAL_ALERT"
         )
@@ -200,6 +202,7 @@ class TestProbabilisticBehavior:
 
     def test_deployment_eta_within_documented_range(self) -> None:
         import random
+
         random.seed(42)
         for _ in range(100):
             result = request_drone_deployment("Sector-1", "high")
@@ -207,7 +210,9 @@ class TestProbabilisticBehavior:
                 assert 30 <= result.eta_seconds <= 120
 
     def test_drone_id_format_consistent(self) -> None:
-        import random, re
+        import random
+        import re
+
         random.seed(42)
         pattern = re.compile(r"^UNIT-\d{3}$")
         for _ in range(100):
@@ -217,6 +222,7 @@ class TestProbabilisticBehavior:
 
     def test_swarm_battery_within_range(self) -> None:
         import random
+
         random.seed(42)
         for _ in range(100):
             status = get_drone_swarm_status()

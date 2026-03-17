@@ -163,7 +163,9 @@ class TestSimulationProcessor:
     @pytest.mark.asyncio
     async def test_pending_transitions_to_processing(self) -> None:
         from unittest.mock import AsyncMock
+
         from resq_mcp.server import simulation_processor, simulations
+
         simulations["SIM-BG-001"] = {"status": "pending", "request": {}, "created_at": "now"}
         mock_server = AsyncMock()
         mock_server.notify_resource_updated = AsyncMock()
@@ -179,8 +181,15 @@ class TestSimulationProcessor:
     @pytest.mark.asyncio
     async def test_processing_transitions_to_completed(self) -> None:
         from unittest.mock import AsyncMock
+
         from resq_mcp.server import simulation_processor, simulations
-        simulations["SIM-BG-002"] = {"status": "processing", "progress": 0.5, "request": {}, "created_at": "now"}
+
+        simulations["SIM-BG-002"] = {
+            "status": "processing",
+            "progress": 0.5,
+            "request": {},
+            "created_at": "now",
+        }
         mock_server = AsyncMock()
         mock_server.notify_resource_updated = AsyncMock()
         task = asyncio.create_task(simulation_processor(mock_server))
@@ -195,7 +204,9 @@ class TestSimulationProcessor:
     @pytest.mark.asyncio
     async def test_notification_failure_does_not_crash_processor(self) -> None:
         from unittest.mock import AsyncMock
+
         from resq_mcp.server import simulation_processor, simulations
+
         simulations["SIM-BG-003"] = {"status": "pending", "request": {}, "created_at": "now"}
         mock_server = AsyncMock()
         mock_server.notify_resource_updated = AsyncMock(side_effect=RuntimeError("SSE down"))
@@ -210,6 +221,7 @@ class TestSimulationProcessor:
 class TestListActiveDrones:
     def test_returns_fleet_status(self) -> None:
         from resq_mcp.server import list_active_drones
+
         result = list_active_drones()
         assert "DRONE-Alpha" in result
         assert "DRONE-Beta" in result
@@ -217,6 +229,7 @@ class TestListActiveDrones:
 
     def test_includes_all_drone_types(self) -> None:
         from resq_mcp.server import list_active_drones
+
         result = list_active_drones()
         assert "Surveillance" in result
         assert "Payload" in result
@@ -226,17 +239,20 @@ class TestListActiveDrones:
 class TestIncidentResponsePlan:
     def test_prompt_includes_incident_id(self) -> None:
         from resq_mcp.server import incident_response_plan
+
         result = incident_response_plan("INC-999")
         assert "INC-999" in result
 
     def test_prompt_references_tools(self) -> None:
         from resq_mcp.server import incident_response_plan
+
         result = incident_response_plan("INC-001")
         assert "get_deployment_strategy" in result
         assert "resq://drones/active" in result
 
     def test_prompt_includes_output_format(self) -> None:
         from resq_mcp.server import incident_response_plan
+
         result = incident_response_plan("INC-001")
         assert "Situation Summary" in result
         assert "Asset Allocation" in result

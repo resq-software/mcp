@@ -153,6 +153,7 @@ class TestEdgeCases:
 
     def test_predictive_alert_probability_always_valid(self) -> None:
         import random
+
         random.seed(42)
         for _ in range(200):
             for sector_id in ["Sector-1", "Sector-2", "Sector-3", "Sector-4"]:

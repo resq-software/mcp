@@ -69,4 +69,4 @@ def get_polling_interval(attempt: int) -> float:
     """
     base = float(os.getenv("RESQ_POLLING_BASE_INTERVAL", "1.0"))
     cap = float(os.getenv("RESQ_POLLING_MAX_INTERVAL", "5.0"))
-    return min(base * (2**attempt), cap)
+    return float(min(base * (2**attempt), cap))

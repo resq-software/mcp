@@ -77,17 +77,21 @@ class TestTraceDecorator:
 
     def test_trace_preserves_function_name(self) -> None:
         from resq_mcp.telemetry import trace
+
         @trace("test.span")
         def my_named_func() -> None:
             # intentionally empty: only the function name is under test
             pass
+
         assert my_named_func.__name__ == "my_named_func"
 
     @pytest.mark.asyncio
     async def test_trace_works_with_async_functions(self) -> None:
         from resq_mcp.telemetry import trace
+
         @trace("async.span")
         async def my_async_func(x: int) -> int:
             return x * 3
+
         result = await my_async_func(7)
         assert result == 21
