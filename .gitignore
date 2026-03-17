@@ -15,4 +15,4 @@ dist/
 
 # Coverage artifacts
 .coverage
-htmlcov/
+htmlcov/docs/
