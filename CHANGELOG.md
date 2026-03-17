@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.4 (2026-03-17)
+
+### Bug Fixes
+
+- **ci**: Use GitHub API directly for release asset uploads (avoids immutable release error)
+  ([`92fc25f`](https://github.com/resq-software/mcp/commit/92fc25fb01fb557d0fbfceb03f3063bb4c199d62))
+
+
 ## v0.3.3 (2026-03-17)
 
 ### Bug Fixes
