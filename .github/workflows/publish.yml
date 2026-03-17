@@ -144,16 +144,14 @@ jobs:
           path: sbom/
 
       - name: Upload release artifacts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "${{ needs.release.outputs.tag }}" \
-            dist-signed/*.tar.gz \
-            dist-signed/*.whl \
-            dist-signed/*.sigstore.json \
-            sbom/sbom.cyclonedx.json \
-            --repo "${{ github.repository }}" \
-            --clobber
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          files: |
+            dist-signed/*.tar.gz
+            dist-signed/*.whl
+            dist-signed/*.sigstore.json
+            sbom/sbom.cyclonedx.json
 
   # Note: The spec mentions slsa-framework/slsa-github-generator for SLSA L2.
   # We use actions/attest-build-provenance instead — it's GitHub's native
