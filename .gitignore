@@ -5,3 +5,4 @@ dist/
 *.egg-info/
 .env
 .python-version
+.claude/settings.local.json
