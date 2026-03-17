@@ -1,6 +1,102 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-03-17)
+
+### Chores
+
+- **deps**: Bump astral-sh/setup-uv from 5 to 7 ([#4](https://github.com/resq-software/mcp/pull/4),
+  [`f0a2b99`](https://github.com/resq-software/mcp/commit/f0a2b99025d58d1bb9c5b0f9cf73121cc6b4f492))
+
+Bumps [astral-sh/setup-uv](https://github.com/astral-sh/setup-uv) from 5 to 7. - [Release
+  notes](https://github.com/astral-sh/setup-uv/releases) -
+  [Commits](https://github.com/astral-sh/setup-uv/compare/v5...v7)
+
+--- updated-dependencies: - dependency-name: astral-sh/setup-uv dependency-version: '7'
+
+dependency-type: direct:production
+
+update-type: version-update:semver-major ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps**: Bump codecov/codecov-action from 4 to 5
+  ([#6](https://github.com/resq-software/mcp/pull/6),
+  [`68dc997`](https://github.com/resq-software/mcp/commit/68dc997a7dbcecbe47e720704bbd52ed9510de16))
+
+Bumps [codecov/codecov-action](https://github.com/codecov/codecov-action) from 4 to 5. - [Release
+  notes](https://github.com/codecov/codecov-action/releases) -
+  [Changelog](https://github.com/codecov/codecov-action/blob/main/CHANGELOG.md) -
+  [Commits](https://github.com/codecov/codecov-action/compare/v4...v5)
+
+--- updated-dependencies: - dependency-name: codecov/codecov-action dependency-version: '5'
+
+dependency-type: direct:production
+
+update-type: version-update:semver-major ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **deps**: Bump docker/login-action from 3 to 4 ([#5](https://github.com/resq-software/mcp/pull/5),
+  [`8fc2f3a`](https://github.com/resq-software/mcp/commit/8fc2f3ade2778ac00533cbb88744434ae173c1d5))
+
+Bumps [docker/login-action](https://github.com/docker/login-action) from 3 to 4. - [Release
+  notes](https://github.com/docker/login-action/releases) -
+  [Commits](https://github.com/docker/login-action/compare/v3...v4)
+
+--- updated-dependencies: - dependency-name: docker/login-action dependency-version: '4'
+
+dependency-type: direct:production
+
+update-type: version-update:semver-major ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+### Documentation
+
+- Update README with AI-generated content
+  ([`03842df`](https://github.com/resq-software/mcp/commit/03842df248556abcab6ecb85d7602143f5729920))
+
+- Update README with AI-generated content
+  ([`81ace88`](https://github.com/resq-software/mcp/commit/81ace886419536b925e7b8d4adabceb669ea2dab))
+
+- Update README with AI-generated content
+  ([`1af74e4`](https://github.com/resq-software/mcp/commit/1af74e4af68848d6c277d2c3ca219aafa3c24814))
+
+### Features
+
+- Enterprise-grade publishing, CI hardening, test quality & domain restructure
+  ([`9de8b21`](https://github.com/resq-software/mcp/commit/9de8b214974bb68693907f88af1e99d8709e2400))
+
+## What changed
+
+### CI/CD & Publishing - OIDC Trusted Publisher for PyPI (no API tokens) - Sigstore artifact signing
+  + build attestation with verification - CycloneDX SBOM generation attached to GitHub Releases - CI
+  matrix: Python 3.11, 3.12, 3.13, 3.14-dev - Separate lint, typecheck, security gates → test →
+  build-verify pipeline - TestPyPI publish on PRs after full pipeline passes - py.typed marker (PEP
+  561)
+
+### Test Quality - 94 → 156 tests, 85% → 92% coverage with enforced gate - Hypothesis property-based
+  testing for Pydantic models - Integration tests: 3 cross-module workflows - Probabilistic
+  distribution tests for drone tools - Edge case tests across all domain modules - Factory fixtures
+  in conftest.py
+
+### Domain Restructure - Flat 13-file package → 5 domain packages (core, drone, dtsop, hce, pdie) -
+  server.py split into server + resources + prompts - models.py split into domain-specific model
+  files - Tests reorganized into unit/, integration/, property/
+
+### Enterprise Utilities - MCPErrorFormatter: structured JSON errors with context redaction -
+  Centralized timeout config with env-var override and exponential backoff
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.2.0 (2026-03-15)
 
 ### Bug Fixes
