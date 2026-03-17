@@ -114,6 +114,7 @@ jobs:
           VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           sed -i "s/^version = .*/version = \"${VERSION}.dev${{ github.run_number }}\"/" pyproject.toml
       - run: uv run python -m build
+      - run: uv run twine check dist/*
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/

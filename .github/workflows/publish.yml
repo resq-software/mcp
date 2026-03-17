@@ -145,6 +145,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ needs.release.outputs.tag }}" \
+            dist-signed/*.tar.gz \
+            dist-signed/*.whl \
             dist-signed/*.sigstore.json \
             sbom/sbom.cyclonedx.json \
             --repo "${{ github.repository }}"
