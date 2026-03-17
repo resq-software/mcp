@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-03-17)
+
+### Bug Fixes
+
+- **ci**: Use PYPI_TOKEN for publishing, pin sigstore action version
+  ([`39d50cd`](https://github.com/resq-software/mcp/commit/39d50cdd05444c5c0dbbfd6d23476d4b61a39a5a))
+
+- Fall back to PYPI_TOKEN secret until Trusted Publisher is configured on pypi.org for the
+  resq-software org - Pin sigstore/gh-action-sigstore-python to v3.2.0 (v3 major tag doesn't exist)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.0 (2026-03-17)
 
 ### Chores
