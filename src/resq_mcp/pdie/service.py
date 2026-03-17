@@ -28,7 +28,8 @@ import random
 import uuid
 from typing import Final
 
-from .models import ErrorResponse, PreAlert, VulnerabilityMap
+from resq_mcp.core.models import ErrorResponse
+from resq_mcp.pdie.models import PreAlert, VulnerabilityMap
 
 # Probability thresholds for alert generation
 _FIRE_RISK_THRESHOLD: Final[float] = 0.5

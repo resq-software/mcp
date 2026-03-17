@@ -26,36 +26,35 @@ Example:
 
 from __future__ import annotations
 
-from .config import Settings, settings
-from .dtsop import get_optimization_strategy, run_simulation
-from .hce import update_mission_params, validate_incident
-from .models import (
+from resq_mcp.core.config import Settings, settings
+from resq_mcp.core.models import (
     Coordinates,
-    DeploymentRequest,
-    DeploymentStatus,
+    DetectedObject,
     DisasterScenario,
     ErrorResponse,
-    IncidentReport,
-    IncidentValidation,
-    MissionParameters,
-    NetworkStatus,
-    OptimizationStrategy,
-    PreAlert,
     Sector,
+)
+from resq_mcp.drone.models import (
+    DeploymentRequest,
+    DeploymentStatus,
+    NetworkStatus,
     SectorAnalysis,
     SectorStatusSummary,
-    SimulationRequest,
     SwarmStatus,
-    VulnerabilityMap,
 )
-from .pdie import get_predictive_alerts, get_vulnerability_map
-from .server import mcp
-from .tools import (
+from resq_mcp.drone.service import (
     get_all_sectors_status,
     get_drone_swarm_status,
     request_drone_deployment,
     scan_current_sector,
 )
+from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.service import get_optimization_strategy, run_simulation
+from resq_mcp.hce.models import IncidentReport, IncidentValidation, MissionParameters
+from resq_mcp.hce.service import update_mission_params, validate_incident
+from resq_mcp.pdie.models import PreAlert, VulnerabilityMap
+from resq_mcp.pdie.service import get_predictive_alerts, get_vulnerability_map
+from resq_mcp.server import mcp
 
 __version__ = "2.0.0"
 
@@ -67,6 +66,7 @@ __all__ = [  # noqa: RUF022 - Organized by category for readability
     "settings",
     # Models - Common
     "Coordinates",
+    "DetectedObject",
     "Sector",
     "ErrorResponse",
     # Models - Drone Feed

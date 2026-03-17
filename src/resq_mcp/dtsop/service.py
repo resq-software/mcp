@@ -28,7 +28,7 @@ import random
 import uuid
 from typing import Final
 
-from .models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
 
 # Pre-defined strategy templates for simulation
 _STRATEGY_TEMPLATES: Final[list[dict[str, object]]] = [
