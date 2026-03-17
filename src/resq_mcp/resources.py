@@ -75,7 +75,7 @@ async def get_simulation_status(sim_id: str) -> str:
     return f"""
     Simulation ID: {sim_id}
     Status: {sim["status"]}
-    Progress: {int(sim.get("progress", 0) * 100)}%
+    Progress: {int((sim.get("progress") or 0) * 100)}%
     Result: {sim.get("result_url", "N/A")}
     Parameters: {sim.get("request", {})}
     """

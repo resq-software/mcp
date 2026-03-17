@@ -32,7 +32,6 @@ class TestProbabilisticBehavior:
         random.seed(42)
         n_runs = 1000
         detections = 0
-        random.seed(42)
         for _ in range(n_runs):
             result = scan_current_sector("Sector-1")
             if isinstance(result, SectorAnalysis) and result.status == "CRITICAL_ALERT":

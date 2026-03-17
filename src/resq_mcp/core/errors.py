@@ -75,7 +75,14 @@ class MCPErrorFormatter:
             "exception_message": str(exception),
         }
         if context:
-            details["context"] = context
+            # Redact sensitive keys before including in client-facing response
+            safe_context = {
+                k: v
+                for k, v in context.items()
+                if k.lower()
+                not in {"authorization", "token", "password", "secret", "api_key", "cookie"}
+            }
+            details["context"] = safe_context
         return MCPErrorFormatter.format_error(
             error_type=error_type,
             message=f"Failed to {operation}: {exception}",

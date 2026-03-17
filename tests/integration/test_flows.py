@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Generator
 
 import pytest
 
@@ -87,6 +88,15 @@ class TestSurveillanceToDeploymentFlow:
 
 
 class TestSimulationLifecycle:
+    @pytest.fixture(autouse=True)
+    def _clear_simulations(self) -> Generator[None, None, None]:
+        """Clear simulations before and after each test."""
+        from resq_mcp.server import simulations
+
+        simulations.clear()
+        yield
+        simulations.clear()
+
     @pytest.mark.asyncio
     async def test_simulation_end_to_end(self) -> None:
         from fastmcp.exceptions import FastMCPError
@@ -95,8 +105,6 @@ class TestSimulationLifecycle:
         from resq_mcp.dtsop.service import run_simulation
         from resq_mcp.resources import get_simulation_status
         from resq_mcp.server import simulations
-
-        simulations.clear()
 
         request = SimulationRequest(
             scenario_id="integ-sim-001",
@@ -130,5 +138,3 @@ class TestSimulationLifecycle:
 
         with pytest.raises(FastMCPError):
             await get_simulation_status("SIM-NONEXISTENT")
-
-        simulations.clear()

@@ -112,7 +112,7 @@ def make_simulation_request() -> Callable[..., SimulationRequest]:
             scenario_id=scenario_id,
             sector_id=sector_id,
             disaster_type=disaster_type,
-            parameters=parameters or {"water_level": 5.0},
+            parameters={"water_level": 5.0} if parameters is None else parameters,
             priority=priority,
         )
 

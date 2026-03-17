@@ -41,12 +41,25 @@ class TimeoutConfig:
     read: float
 
 
+def _safe_float(env_var: str, default: str) -> float:
+    """Parse a positive float from an env var, falling back to default."""
+    try:
+        val = float(os.getenv(env_var, default))
+    except (ValueError, TypeError):
+        val = float(default)
+    import math
+
+    if val <= 0 or math.isnan(val) or math.isinf(val):
+        return float(default)
+    return val
+
+
 def get_default_timeout() -> TimeoutConfig:
     """Get default timeout configuration from environment or defaults."""
     return TimeoutConfig(
-        total=float(os.getenv("RESQ_REQUEST_TIMEOUT", "30.0")),
-        connect=float(os.getenv("RESQ_CONNECT_TIMEOUT", "5.0")),
-        read=float(os.getenv("RESQ_READ_TIMEOUT", "20.0")),
+        total=_safe_float("RESQ_REQUEST_TIMEOUT", "30.0"),
+        connect=_safe_float("RESQ_CONNECT_TIMEOUT", "5.0"),
+        read=_safe_float("RESQ_READ_TIMEOUT", "20.0"),
     )
 
 
@@ -67,6 +80,6 @@ def get_polling_interval(attempt: int) -> float:
     Returns:
         Sleep interval in seconds.
     """
-    base = float(os.getenv("RESQ_POLLING_BASE_INTERVAL", "1.0"))
-    cap = float(os.getenv("RESQ_POLLING_MAX_INTERVAL", "5.0"))
+    base = _safe_float("RESQ_POLLING_BASE_INTERVAL", "1.0")
+    cap = _safe_float("RESQ_POLLING_MAX_INTERVAL", "5.0")
     return float(min(base * (2**attempt), cap))
