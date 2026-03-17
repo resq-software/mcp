@@ -20,13 +20,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from resq_mcp.models import (
-    Coordinates,
-    IncidentReport,
-    IncidentValidation,
-    SectorAnalysis,
-    SimulationRequest,
-)
+from resq_mcp.core.models import Coordinates
+from resq_mcp.drone.models import SectorAnalysis
+from resq_mcp.dtsop.models import SimulationRequest
+from resq_mcp.hce.models import IncidentReport, IncidentValidation
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -35,7 +35,7 @@ class TestVerifyApiKey:
         return request
 
     def test_missing_auth_header_raises_401(self) -> None:
-        from resq_mcp.security import verify_api_key
+        from resq_mcp.core.security import verify_api_key
 
         request = self._make_request()
         with pytest.raises(HTTPException) as exc_info:
@@ -44,7 +44,7 @@ class TestVerifyApiKey:
         assert "Missing" in str(exc_info.value.detail)
 
     def test_invalid_scheme_raises_401(self) -> None:
-        from resq_mcp.security import verify_api_key
+        from resq_mcp.core.security import verify_api_key
 
         request = self._make_request("Basic some-token")
         with pytest.raises(HTTPException) as exc_info:
@@ -53,7 +53,7 @@ class TestVerifyApiKey:
         assert "Scheme" in str(exc_info.value.detail)
 
     def test_invalid_token_raises_403(self) -> None:
-        from resq_mcp.security import verify_api_key
+        from resq_mcp.core.security import verify_api_key
 
         request = self._make_request("Bearer wrong-token-value")
         with pytest.raises(HTTPException) as exc_info:
@@ -62,8 +62,8 @@ class TestVerifyApiKey:
         assert "Invalid API Key" in str(exc_info.value.detail)
 
     def test_valid_token_returns_token(self) -> None:
-        from resq_mcp.config import settings
-        from resq_mcp.security import verify_api_key
+        from resq_mcp.core.config import settings
+        from resq_mcp.core.security import verify_api_key
 
         valid_token = settings.API_KEY
         request = self._make_request(f"Bearer {valid_token}")
@@ -71,8 +71,8 @@ class TestVerifyApiKey:
         assert result == valid_token
 
     def test_bearer_scheme_is_case_insensitive(self) -> None:
-        from resq_mcp.config import settings
-        from resq_mcp.security import verify_api_key
+        from resq_mcp.core.config import settings
+        from resq_mcp.core.security import verify_api_key
 
         valid_token = settings.API_KEY
         request = self._make_request(f"BEARER {valid_token}")
@@ -80,7 +80,7 @@ class TestVerifyApiKey:
         assert result == valid_token
 
     def test_empty_bearer_value_raises_403(self) -> None:
-        from resq_mcp.security import verify_api_key
+        from resq_mcp.core.security import verify_api_key
 
         request = self._make_request("Bearer ")
         with pytest.raises(HTTPException) as exc_info:
@@ -88,8 +88,8 @@ class TestVerifyApiKey:
         assert exc_info.value.status_code == 403
 
     def test_multi_space_separator(self) -> None:
-        from resq_mcp.config import settings
-        from resq_mcp.security import verify_api_key
+        from resq_mcp.core.config import settings
+        from resq_mcp.core.security import verify_api_key
 
         request = self._make_request(f"Bearer  {settings.API_KEY}")
         with pytest.raises(HTTPException) as exc_info:
@@ -97,7 +97,7 @@ class TestVerifyApiKey:
         assert exc_info.value.status_code == 403
 
     def test_only_scheme_no_space(self) -> None:
-        from resq_mcp.security import verify_api_key
+        from resq_mcp.core.security import verify_api_key
 
         request = self._make_request("Bearer")
         with pytest.raises(HTTPException) as exc_info:

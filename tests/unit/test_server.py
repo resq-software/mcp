@@ -23,9 +23,10 @@ import pytest
 from fastmcp.exceptions import FastMCPError
 from pydantic import ValidationError
 
-from resq_mcp.dtsop import run_simulation as trigger_sim
-from resq_mcp.models import OptimizationStrategy, SimulationRequest
-from resq_mcp.server import get_simulation_status, simulations
+from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.service import run_simulation as trigger_sim
+from resq_mcp.resources import get_simulation_status
+from resq_mcp.server import simulations
 
 
 @pytest.fixture(autouse=True)
@@ -220,7 +221,7 @@ class TestSimulationProcessor:
 
 class TestListActiveDrones:
     def test_returns_fleet_status(self) -> None:
-        from resq_mcp.server import list_active_drones
+        from resq_mcp.resources import list_active_drones
 
         result = list_active_drones()
         assert "DRONE-Alpha" in result
@@ -228,7 +229,7 @@ class TestListActiveDrones:
         assert "DRONE-Gamma" in result
 
     def test_includes_all_drone_types(self) -> None:
-        from resq_mcp.server import list_active_drones
+        from resq_mcp.resources import list_active_drones
 
         result = list_active_drones()
         assert "Surveillance" in result
@@ -238,20 +239,20 @@ class TestListActiveDrones:
 
 class TestIncidentResponsePlan:
     def test_prompt_includes_incident_id(self) -> None:
-        from resq_mcp.server import incident_response_plan
+        from resq_mcp.prompts import incident_response_plan
 
         result = incident_response_plan("INC-999")
         assert "INC-999" in result
 
     def test_prompt_references_tools(self) -> None:
-        from resq_mcp.server import incident_response_plan
+        from resq_mcp.prompts import incident_response_plan
 
         result = incident_response_plan("INC-001")
         assert "get_deployment_strategy" in result
         assert "resq://drones/active" in result
 
     def test_prompt_includes_output_format(self) -> None:
-        from resq_mcp.server import incident_response_plan
+        from resq_mcp.prompts import incident_response_plan
 
         result = incident_response_plan("INC-001")
         assert "Situation Summary" in result

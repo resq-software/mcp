@@ -21,7 +21,7 @@ import json
 
 class TestMCPErrorFormatter:
     def test_format_basic_error(self) -> None:
-        from resq_mcp.errors import MCPErrorFormatter
+        from resq_mcp.core.errors import MCPErrorFormatter
 
         result = MCPErrorFormatter.format_error(
             error_type="validation_error", message="Sector not found"
@@ -32,7 +32,7 @@ class TestMCPErrorFormatter:
         assert parsed["error"]["message"] == "Sector not found"
 
     def test_format_error_with_details_and_suggestion(self) -> None:
-        from resq_mcp.errors import MCPErrorFormatter
+        from resq_mcp.core.errors import MCPErrorFormatter
 
         result = MCPErrorFormatter.format_error(
             error_type="not_found",
@@ -45,7 +45,7 @@ class TestMCPErrorFormatter:
         assert "Check the simulation" in parsed["error"]["suggestion"]
 
     def test_format_error_without_optionals(self) -> None:
-        from resq_mcp.errors import MCPErrorFormatter
+        from resq_mcp.core.errors import MCPErrorFormatter
 
         result = MCPErrorFormatter.format_error(
             error_type="internal_error", message="Something went wrong"
@@ -56,7 +56,7 @@ class TestMCPErrorFormatter:
         assert "http_status" not in parsed["error"]
 
     def test_from_exception(self) -> None:
-        from resq_mcp.errors import MCPErrorFormatter
+        from resq_mcp.core.errors import MCPErrorFormatter
 
         try:
             raise ValueError("Invalid sector_id format")

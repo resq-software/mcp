@@ -22,21 +22,21 @@ from unittest.mock import patch
 
 class TestTimeoutConfig:
     def test_default_request_timeout(self) -> None:
-        from resq_mcp.timeout import get_default_timeout
+        from resq_mcp.core.timeout import get_default_timeout
 
         timeout = get_default_timeout()
         assert timeout.total == 30.0
         assert timeout.connect == 5.0
 
     def test_env_var_override(self) -> None:
-        from resq_mcp.timeout import get_default_timeout
+        from resq_mcp.core.timeout import get_default_timeout
 
         with patch.dict(os.environ, {"RESQ_REQUEST_TIMEOUT": "60.0"}):
             timeout = get_default_timeout()
             assert timeout.total == 60.0
 
     def test_polling_interval_exponential_backoff(self) -> None:
-        from resq_mcp.timeout import get_polling_interval
+        from resq_mcp.core.timeout import get_polling_interval
 
         intervals = [get_polling_interval(i) for i in range(5)]
         assert intervals[0] == 1.0
@@ -46,6 +46,6 @@ class TestTimeoutConfig:
         assert intervals[4] == 5.0
 
     def test_max_polling_attempts_default(self) -> None:
-        from resq_mcp.timeout import get_max_polling_attempts
+        from resq_mcp.core.timeout import get_max_polling_attempts
 
         assert get_max_polling_attempts() == 30

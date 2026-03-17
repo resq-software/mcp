@@ -20,19 +20,14 @@ import random
 
 import pytest
 
-from resq_mcp.dtsop import get_optimization_strategy
-from resq_mcp.hce import update_mission_params, validate_incident
-from resq_mcp.models import (
-    DeploymentStatus,
-    ErrorResponse,
-    IncidentReport,
-    IncidentValidation,
-    MissionParameters,
-    OptimizationStrategy,
-    SectorAnalysis,
-)
-from resq_mcp.pdie import get_predictive_alerts
-from resq_mcp.tools import request_drone_deployment, scan_current_sector
+from resq_mcp.core.models import ErrorResponse
+from resq_mcp.drone.models import DeploymentStatus, SectorAnalysis
+from resq_mcp.drone.service import request_drone_deployment, scan_current_sector
+from resq_mcp.dtsop.models import OptimizationStrategy
+from resq_mcp.dtsop.service import get_optimization_strategy
+from resq_mcp.hce.models import IncidentReport, IncidentValidation, MissionParameters
+from resq_mcp.hce.service import update_mission_params, validate_incident
+from resq_mcp.pdie.service import get_predictive_alerts
 
 
 class TestIncidentToMissionFlow:
@@ -96,9 +91,10 @@ class TestSimulationLifecycle:
     async def test_simulation_end_to_end(self) -> None:
         from fastmcp.exceptions import FastMCPError
 
-        from resq_mcp.dtsop import run_simulation
-        from resq_mcp.models import SimulationRequest
-        from resq_mcp.server import get_simulation_status, simulations
+        from resq_mcp.dtsop.models import SimulationRequest
+        from resq_mcp.dtsop.service import run_simulation
+        from resq_mcp.resources import get_simulation_status
+        from resq_mcp.server import simulations
 
         simulations.clear()
 

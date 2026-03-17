@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
-from resq_mcp.dtsop import get_optimization_strategy, run_simulation
-from resq_mcp.models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.service import get_optimization_strategy, run_simulation
 
 
 class TestRunSimulation:

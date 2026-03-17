@@ -24,20 +24,11 @@ from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
 from pydantic import ValidationError
 
-from resq_mcp.models import (
-    Coordinates,
-    DeploymentRequest,
-    ErrorResponse,
-    IncidentReport,
-    IncidentValidation,
-    MissionParameters,
-    PreAlert,
-    Sector,
-    SectorAnalysis,
-    SimulationRequest,
-    SwarmStatus,
-    VulnerabilityMap,
-)
+from resq_mcp.core.models import Coordinates, ErrorResponse, Sector
+from resq_mcp.drone.models import DeploymentRequest, SectorAnalysis, SwarmStatus
+from resq_mcp.dtsop.models import SimulationRequest
+from resq_mcp.hce.models import IncidentReport, IncidentValidation, MissionParameters
+from resq_mcp.pdie.models import PreAlert, VulnerabilityMap
 
 
 class TestCoordinates:

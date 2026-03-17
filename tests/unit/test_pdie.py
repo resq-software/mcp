@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import pytest
 
-from resq_mcp.models import ErrorResponse, PreAlert, VulnerabilityMap
-from resq_mcp.pdie import (
+from resq_mcp.core.models import ErrorResponse
+from resq_mcp.pdie.models import PreAlert, VulnerabilityMap
+from resq_mcp.pdie.service import (
     VULNERABILITY_DB,
     get_predictive_alerts,
     get_vulnerability_map,
