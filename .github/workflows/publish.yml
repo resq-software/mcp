@@ -8,14 +8,17 @@ on:
 permissions:
   contents: write
   id-token: write
+  attestations: write
 
 jobs:
   release:
-    name: Release
+    name: Semantic Release
     runs-on: ubuntu-latest
     concurrency: release
     outputs:
       released: ${{ steps.release.outputs.released }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -24,7 +27,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Python Semantic Release
         id: release
@@ -32,28 +35,161 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish to PyPI
-        if: steps.release.outputs.released == 'true'
-        uses: python-semantic-release/publish-action@v10
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pypi_token: ${{ secrets.PYPI_TOKEN }}
-
-  docker:
-    name: Docker
+  build:
+    name: Build
     needs: release
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          ref: ${{ needs.release.outputs.tag }}
 
-      - name: Get latest tag
-        id: tag
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - run: uv sync
+
+      - name: Build sdist and wheel
+        run: uv run python -m build
+
+      - name: Verify distributions
+        run: uv run twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  sign:
+    name: Sign Artifacts
+    needs: [release, build]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Sign with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v3
+        with:
+          inputs: ./dist/*.tar.gz ./dist/*.whl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-signed
+          path: dist/
+
+  sbom:
+    name: Generate SBOM
+    needs: [release, build]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cyclonedx.json
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [release, build]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-github:
+    name: Publish to GitHub Release
+    needs: [release, sign, sbom, attestation]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-signed
+          path: dist-signed/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
+
+      - name: Upload release artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          gh release upload "${{ needs.release.outputs.tag }}" \
+            dist-signed/*.tar.gz \
+            dist-signed/*.whl \
+            dist-signed/*.sigstore.json \
+            sbom/sbom.cyclonedx.json \
+            --repo "${{ github.repository }}"
+
+  # Note: The spec mentions slsa-framework/slsa-github-generator for SLSA L2.
+  # We use actions/attest-build-provenance instead — it's GitHub's native
+  # attestation, simpler to integrate, and produces SLSA-compatible provenance.
+  attestation:
+    name: Generate Attestation
+    needs: [release, build]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*
+
+      - name: Verify attestation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for f in dist/*.whl dist/*.tar.gz; do
+            gh attestation verify "$f" --repo "${{ github.repository }}"
+          done
+
+  docker:
+    name: Docker
+    needs: [release, publish-pypi]
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release.outputs.tag }}
 
       - uses: docker/login-action@v4
         with:
@@ -65,4 +201,4 @@ jobs:
           push: true
           tags: |
             resqsoftware/mcp:latest
-            resqsoftware/mcp:${{ steps.tag.outputs.version }}
+            resqsoftware/mcp:${{ needs.release.outputs.version }}

@@ -27,9 +27,12 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import UTC, datetime
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
-from .models import ErrorResponse, IncidentReport, IncidentValidation, MissionParameters
+from resq_mcp.hce.models import IncidentReport, IncidentValidation, MissionParameters
+
+if TYPE_CHECKING:
+    from resq_mcp.core.models import ErrorResponse
 
 # Confidence threshold for auto-confirmation
 _AUTO_CONFIRM_THRESHOLD: Final[float] = 0.85
@@ -76,7 +79,7 @@ def validate_incident(report: IncidentReport) -> IncidentValidation:
             - notes: Detailed reasoning for decision
 
     Example:
-        >>> from resq_mcp.models import IncidentReport
+        >>> from resq_mcp.hce.models import IncidentReport
         >>> report = IncidentReport(
         ...     incident_id="INC-123",
         ...     source="edge_ai",

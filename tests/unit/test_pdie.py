@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import pytest
 
-from resq_mcp.models import ErrorResponse, PreAlert, VulnerabilityMap
-from resq_mcp.pdie import (
+from resq_mcp.core.models import ErrorResponse
+from resq_mcp.pdie.models import PreAlert, VulnerabilityMap
+from resq_mcp.pdie.service import (
     VULNERABILITY_DB,
     get_predictive_alerts,
     get_vulnerability_map,
@@ -140,3 +141,24 @@ class TestGetPredictiveAlerts:
 
         # Should get very few or no flood alerts
         assert len(flood_alerts) == 0
+
+
+class TestEdgeCases:
+    def test_vulnerability_map_unknown_sector(self) -> None:
+        result = get_vulnerability_map("Sector-999")
+        assert isinstance(result, ErrorResponse)
+
+    def test_predictive_alerts_unknown_sector(self) -> None:
+        result = get_predictive_alerts("Sector-999")
+        assert isinstance(result, ErrorResponse)
+
+    def test_predictive_alert_probability_always_valid(self) -> None:
+        import random
+
+        random.seed(42)
+        for _ in range(200):
+            for sector_id in ["Sector-1", "Sector-2", "Sector-3", "Sector-4"]:
+                result = get_predictive_alerts(sector_id)
+                if isinstance(result, list):
+                    for alert in result:
+                        assert 0.0 <= alert.probability <= 1.0

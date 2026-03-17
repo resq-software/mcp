@@ -86,7 +86,7 @@ def validate_environment(require_api_key: bool = False) -> None:
         ConfigurationError: If any required environment variable is missing or invalid.
 
     Example:
-        >>> from resq_mcp.config import validate_environment
+        >>> from resq_mcp.core.config import validate_environment
         >>> validate_environment(require_api_key=True)
     """
     s = settings

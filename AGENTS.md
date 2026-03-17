@@ -4,9 +4,21 @@
 FastMCP server exposing ResQ platform capabilities to AI clients (Claude, Cursor, etc.). Provides tools for drone dispatch, airspace queries, incident management, and mission planning over the Model Context Protocol.
 
 ## Workspace Layout
-- `src/resq_mcp/` — Main package: tools, resources, prompts, and server entrypoint.
-- `tests/` — pytest test suite.
-- `pyproject.toml` — Project metadata, dependencies, and tool config.
+```
+src/resq_mcp/
+├── server.py              # FastMCP init, lifespan, background tasks
+├── resources.py           # @mcp.resource() endpoints
+├── prompts.py             # @mcp.prompt() templates
+├── core/                  # Cross-cutting: config, errors, security, telemetry, timeout
+├── drone/                 # Drone feed: scan, swarm, deployment (models + service)
+├── dtsop/                 # Digital Twin: simulation, optimization (models + service + tools)
+├── hce/                   # Hybrid Coordination: incidents, missions (models + service + tools)
+└── pdie/                  # Predictive Intelligence: vulnerability, alerts (models + service)
+tests/
+├── unit/                  # Unit tests mirroring source structure
+├── integration/           # Cross-module workflow tests
+└── property/              # Hypothesis property-based tests
+```
 
 ## Commands
 ```bash
@@ -22,15 +34,16 @@ uv run ruff format src/   # Format
 - **Framework**: FastMCP 2.x — tools are plain async Python functions decorated with `@mcp.tool()`.
 - **Transport**: stdio by default; SSE available for remote clients.
 - **Auth**: Bearer token passed via MCP client config; validated in middleware.
-- **Tools** are grouped by domain (drone, airspace, incident, mission) and live under `src/resq_mcp/tools/`.
-- **Resources** expose read-only platform data (maps, status pages) via `@mcp.resource()`.
-- **Prompts** provide reusable prompt templates via `@mcp.prompt()`.
+- **Domain packages** (`drone/`, `dtsop/`, `hce/`, `pdie/`) each contain `models.py` and `service.py`. MCP tool registrations live in `tools.py` within each domain.
+- **Resources** expose read-only platform data via `@mcp.resource()` in `resources.py`.
+- **Prompts** provide reusable prompt templates via `@mcp.prompt()` in `prompts.py`.
+- **Core** (`core/`) holds cross-cutting concerns: config, errors, security, telemetry, timeout.
 
 ## Standards
 - Python 3.11+; use `from __future__ import annotations` in all files.
 - Type-annotate all tool parameters and return types — FastMCP uses these for schema generation.
 - Async functions throughout; no blocking I/O in tool handlers.
-- Tests use pytest + `pytest-asyncio`; mock external HTTP with `respx`.
+- Tests use pytest + `pytest-asyncio`; mock external HTTP with `aioresponses`.
 - All source files carry the Apache-2.0 license header.
 - Keep `AGENTS.md` and `CLAUDE.md` in sync using `./agent-sync.sh`.
 

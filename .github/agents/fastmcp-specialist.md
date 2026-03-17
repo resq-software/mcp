@@ -10,11 +10,12 @@ You are a senior Python engineer building the ResQ MCP server — a [Model Conte
 ## Architecture
 
 - **Entry point:** `src/resq_mcp/__main__.py` (STDIO) / `src/resq_mcp/server.py` (SSE)
-- **Tools:** `src/resq_mcp/tools/` — each module registers tools with `@mcp.tool()`
-- **Resources:** `src/resq_mcp/resources/` — registered with `@mcp.resource("resq://...")`
-- **Prompts:** `src/resq_mcp/prompts/` — registered with `@mcp.prompt()`
-- **Settings:** `src/resq_mcp/config.py` — Pydantic `BaseSettings` loaded from env / `.env`
-- **Types:** `src/resq_mcp/models/` — Pydantic v2 models for all I/O
+- **Server:** `src/resq_mcp/server.py` — FastMCP init, lifespan, background tasks
+- **Tools:** `src/resq_mcp/{dtsop,hce}/tools.py` — domain tools registered with `@mcp.tool()`
+- **Resources:** `src/resq_mcp/resources.py` — registered with `@mcp.resource("resq://...")`
+- **Prompts:** `src/resq_mcp/prompts.py` — registered with `@mcp.prompt()`
+- **Core:** `src/resq_mcp/core/` — config, errors, security, telemetry, timeout
+- **Domains:** `src/resq_mcp/{drone,dtsop,hce,pdie}/` — each has `models.py` + `service.py`
 
 ## Responsibilities
 
@@ -23,7 +24,7 @@ You are a senior Python engineer building the ResQ MCP server — a [Model Conte
 3. **Pydantic** — All tool inputs are validated Pydantic models. Use `model_validator` for cross-field validation. Never use bare `dict` types in tool signatures.
 4. **Error handling** — Raise `McpError` (from `mcp.types`) for protocol-level errors. For internal errors, log and re-raise as `McpError` with a user-safe message.
 5. **Safe mode** — When `RESQ_SAFE_MODE=true`, all side-effecting tools must raise `McpError` explaining they are disabled in safe mode.
-6. **Testing** — Use `pytest-asyncio`. Mock HTTP with `respx` or `httpx.MockTransport`.
+6. **Testing** — Use `pytest-asyncio`. Mock HTTP with `aioresponses`. Tests in `tests/unit/`, `tests/integration/`, `tests/property/`.
 
 ## Review Checklist
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for the ResQ MCP tools module."""
+"""Unit tests for the drone feed module."""
 
 from __future__ import annotations
 
@@ -20,14 +20,14 @@ from unittest.mock import patch
 
 import pytest
 
-from resq_mcp.models import (
+from resq_mcp.core.models import ErrorResponse
+from resq_mcp.drone.models import (
     DeploymentStatus,
-    ErrorResponse,
     NetworkStatus,
     SectorAnalysis,
     SwarmStatus,
 )
-from resq_mcp.tools import (
+from resq_mcp.drone.service import (
     DRONE_SECTORS,
     get_all_sectors_status,
     get_drone_swarm_status,
@@ -58,13 +58,13 @@ class TestScanCurrentSector:
     def test_scan_returns_clear_or_alert_status(self) -> None:
         """Test that scan returns either clear or alert status."""
         # Test clear status (random > 0.3)
-        with patch("resq_mcp.tools.random.random", return_value=0.5):
+        with patch("resq_mcp.drone.service.random.random", return_value=0.5):
             result = scan_current_sector("Sector-1")
             assert isinstance(result, SectorAnalysis)
             assert result.status == "clear"
 
         # Test critical status (random < 0.3)
-        with patch("resq_mcp.tools.random.random", return_value=0.1):
+        with patch("resq_mcp.drone.service.random.random", return_value=0.1):
             result = scan_current_sector("Sector-1")
             assert isinstance(result, SectorAnalysis)
             assert result.status == "CRITICAL_ALERT"

@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
-from resq_mcp.dtsop import get_optimization_strategy, run_simulation
-from resq_mcp.models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.service import get_optimization_strategy, run_simulation
 
 
 class TestRunSimulation:
@@ -99,3 +99,27 @@ class TestGetOptimizationStrategy:
 
         assert result.simulation_proof_url is not None
         assert result.simulation_proof_url.startswith("neofs://")
+
+
+class TestEdgeCases:
+    def test_simulation_id_format(self) -> None:
+        import re
+
+        req = SimulationRequest(
+            scenario_id="edge-001",
+            sector_id="Sector-1",
+            disaster_type="flood",
+            parameters={"water_level": 0.0},
+        )
+        sim_id = run_simulation(req)
+        assert re.match(r"^SIM-[A-F0-9]{8}$", sim_id)
+
+    def test_strategy_success_rate_in_valid_range(self) -> None:
+        for _ in range(50):
+            strategy = get_optimization_strategy("INC-EDGE-001")
+            assert 0.0 <= strategy.estimated_success_rate <= 1.0
+
+    def test_strategy_has_evacuation_routes(self) -> None:
+        for _ in range(50):
+            strategy = get_optimization_strategy("INC-EDGE-002")
+            assert len(strategy.evacuation_routes) > 0

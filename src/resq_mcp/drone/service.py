@@ -30,11 +30,9 @@ import random
 from datetime import UTC, datetime
 from typing import Final
 
-from .models import (
-    Coordinates,
+from resq_mcp.core.models import Coordinates, DisasterScenario, ErrorResponse
+from resq_mcp.drone.models import (
     DeploymentStatus,
-    DisasterScenario,
-    ErrorResponse,
     NetworkStatus,
     SectorAnalysis,
     SectorStatusSummary,

@@ -29,7 +29,7 @@ import logging
 from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPBearer
 
-from .config import settings
+from resq_mcp.core.config import settings
 
 logger = logging.getLogger(__name__)
 

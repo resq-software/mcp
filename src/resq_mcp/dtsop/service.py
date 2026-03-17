@@ -28,7 +28,7 @@ import random
 import uuid
 from typing import Final
 
-from .models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
 
 # Pre-defined strategy templates for simulation
 _STRATEGY_TEMPLATES: Final[list[dict[str, object]]] = [
@@ -72,7 +72,7 @@ def run_simulation(request: SimulationRequest) -> str:
              Use this ID to monitor progress via resq://simulations/{id} resource.
 
     Example:
-        >>> from resq_mcp.models import SimulationRequest
+        >>> from resq_mcp.dtsop.models import SimulationRequest
         >>> req = SimulationRequest(
         ...     scenario_id="flood-scenario-001",
         ...     sector_id="Sector-1",

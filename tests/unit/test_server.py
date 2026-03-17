@@ -16,13 +16,17 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+
 import pytest
 from fastmcp.exceptions import FastMCPError
 from pydantic import ValidationError
 
-from resq_mcp.dtsop import run_simulation as trigger_sim
-from resq_mcp.models import OptimizationStrategy, SimulationRequest
-from resq_mcp.server import get_simulation_status, simulations
+from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
+from resq_mcp.dtsop.service import run_simulation as trigger_sim
+from resq_mcp.resources import get_simulation_status
+from resq_mcp.server import simulations
 
 
 @pytest.fixture(autouse=True)
@@ -152,3 +156,64 @@ class TestGetSimulationStatus:
             await get_simulation_status("SIM-NON-EXISTENT")
 
         assert "not found" in str(exc_info.value)
+
+
+class TestSimulationProcessor:
+    """Tests for the simulation_processor background task."""
+
+    @pytest.mark.asyncio
+    async def test_pending_transitions_to_processing(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from resq_mcp.server import simulation_processor, simulations
+
+        simulations["SIM-BG-001"] = {"status": "pending", "request": {}, "created_at": "now"}
+        mock_server = AsyncMock()
+        mock_server.notify_resource_updated = AsyncMock()
+        task = asyncio.create_task(simulation_processor(mock_server))
+        await asyncio.sleep(2.5)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        assert simulations["SIM-BG-001"]["status"] == "processing"
+        assert simulations["SIM-BG-001"]["progress"] == 0.5
+        mock_server.notify_resource_updated.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_processing_transitions_to_completed(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from resq_mcp.server import simulation_processor, simulations
+
+        simulations["SIM-BG-002"] = {
+            "status": "processing",
+            "progress": 0.5,
+            "request": {},
+            "created_at": "now",
+        }
+        mock_server = AsyncMock()
+        mock_server.notify_resource_updated = AsyncMock()
+        task = asyncio.create_task(simulation_processor(mock_server))
+        await asyncio.sleep(6)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        assert simulations["SIM-BG-002"]["status"] == "completed"
+        assert simulations["SIM-BG-002"]["progress"] == 1.0
+        assert "result_url" in simulations["SIM-BG-002"]
+
+    @pytest.mark.asyncio
+    async def test_notification_failure_does_not_crash_processor(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from resq_mcp.server import simulation_processor, simulations
+
+        simulations["SIM-BG-003"] = {"status": "pending", "request": {}, "created_at": "now"}
+        mock_server = AsyncMock()
+        mock_server.notify_resource_updated = AsyncMock(side_effect=RuntimeError("SSE down"))
+        task = asyncio.create_task(simulation_processor(mock_server))
+        await asyncio.sleep(2.5)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        assert simulations["SIM-BG-003"]["status"] == "processing"

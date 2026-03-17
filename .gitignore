@@ -5,3 +5,17 @@ dist/
 *.egg-info/
 .env
 .python-version
+.claude/settings.local.json
+
+# Tool caches
+.hypothesis/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Coverage artifacts
+.coverage
+htmlcov/
+
+# Superpowers artifacts
+docs/superpowers/
