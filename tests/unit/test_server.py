@@ -217,3 +217,135 @@ class TestSimulationProcessor:
         with contextlib.suppress(asyncio.CancelledError):
             await task
         assert simulations["SIM-BG-003"]["status"] == "processing"
+
+
+class TestCleanupState:
+    """Tests for the _cleanup_state TTL eviction logic."""
+
+    @pytest.fixture(autouse=True)
+    def clear_all_stores(self) -> None:
+        from resq_mcp.server import incidents, missions, simulations
+        simulations.clear()
+        incidents.clear()
+        missions.clear()
+
+    def test_completed_sim_evicted_after_ttl(self) -> None:
+        import time
+
+        from resq_mcp.server import COMPLETED_TTL_SECONDS, _cleanup_state, simulations
+
+        simulations["SIM-EVICT-001"] = {
+            "status": "completed",
+            "completed_at": time.monotonic() - COMPLETED_TTL_SECONDS - 1,
+        }
+        _cleanup_state()
+        assert "SIM-EVICT-001" not in simulations
+
+    def test_completed_sim_kept_before_ttl(self) -> None:
+        import time
+
+        from resq_mcp.server import _cleanup_state, simulations
+
+        simulations["SIM-KEEP-001"] = {
+            "status": "completed",
+            "completed_at": time.monotonic() - 10,
+        }
+        _cleanup_state()
+        assert "SIM-KEEP-001" in simulations
+
+    def test_failed_sim_evicted_after_ttl(self) -> None:
+        import time
+
+        from resq_mcp.server import FAILED_TTL_SECONDS, _cleanup_state, simulations
+
+        simulations["SIM-FAIL-001"] = {
+            "status": "failed",
+            "failed_at": time.monotonic() - FAILED_TTL_SECONDS - 1,
+        }
+        _cleanup_state()
+        assert "SIM-FAIL-001" not in simulations
+
+    def test_rejected_incident_evicted_after_ttl(self) -> None:
+        import time
+
+        from resq_mcp.server import INCIDENT_TTL_SECONDS, _cleanup_state, incidents
+
+        incidents["INC-OLD-REJECT"] = {
+            "is_confirmed": False,
+            "validated_at_mono": time.monotonic() - INCIDENT_TTL_SECONDS - 1,
+        }
+        _cleanup_state()
+        assert "INC-OLD-REJECT" not in incidents
+
+    def test_confirmed_incident_kept_within_24h(self) -> None:
+        import time
+
+        from resq_mcp.server import INCIDENT_TTL_SECONDS, _cleanup_state, incidents
+
+        # Beyond rejected TTL but within confirmed TTL (24h)
+        incidents["INC-CONF-KEEP"] = {
+            "is_confirmed": True,
+            "validated_at_mono": time.monotonic() - INCIDENT_TTL_SECONDS - 1,
+        }
+        _cleanup_state()
+        assert "INC-CONF-KEEP" in incidents
+
+    def test_confirmed_incident_evicted_after_24h(self) -> None:
+        import time
+
+        from resq_mcp.server import CONFIRMED_INCIDENT_TTL_SECONDS, _cleanup_state, incidents
+
+        incidents["INC-CONF-OLD"] = {
+            "is_confirmed": True,
+            "validated_at_mono": time.monotonic() - CONFIRMED_INCIDENT_TTL_SECONDS - 1,
+        }
+        _cleanup_state()
+        assert "INC-CONF-OLD" not in incidents
+
+    def test_stale_mission_evicted_after_ttl(self) -> None:
+        import time
+
+        from resq_mcp.server import MISSION_TTL_SECONDS, _cleanup_state, missions
+
+        missions["DRONE-OLD"] = {
+            "strategy_id": "STRAT-X",
+            "is_urgent": False,
+            "params": {"mission_id": "MISS-00000001", "strategy_hash": "0xdeadbeef",
+                       "target_sector": "Dynamic-Assigned", "authorized_actions": [],
+                       "risk_tolerance": 0.5},
+            "dispatched_at": "2026-01-01T00:00:00+00:00",
+            "dispatched_at_mono": time.monotonic() - MISSION_TTL_SECONDS - 1,
+        }
+        _cleanup_state()
+        assert "DRONE-OLD" not in missions
+
+    def test_active_mission_kept_within_ttl(self) -> None:
+        import time
+
+        from resq_mcp.server import _cleanup_state, missions
+
+        missions["DRONE-ACTIVE"] = {
+            "strategy_id": "STRAT-Y",
+            "is_urgent": False,
+            "params": {"mission_id": "MISS-00000002", "strategy_hash": "0xcafebabe",
+                       "target_sector": "Dynamic-Assigned", "authorized_actions": [],
+                       "risk_tolerance": 0.5},
+            "dispatched_at": "2026-01-01T00:00:00+00:00",
+            "dispatched_at_mono": time.monotonic() - 60,
+        }
+        _cleanup_state()
+        assert "DRONE-ACTIVE" in missions
+
+    def test_incident_with_missing_is_confirmed_not_evicted_early(self) -> None:
+        """Malformed incident record (missing is_confirmed) is not evicted under rejected TTL."""
+        import time
+
+        from resq_mcp.server import INCIDENT_TTL_SECONDS, _cleanup_state, incidents
+
+        incidents["INC-MALFORMED"] = {
+            # No is_confirmed key — should not match either eviction branch
+            "validated_at_mono": time.monotonic() - INCIDENT_TTL_SECONDS - 1,
+        }
+        _cleanup_state()
+        # Malformed record stays put — neither True nor False, so neither branch fires
+        assert "INC-MALFORMED" in incidents

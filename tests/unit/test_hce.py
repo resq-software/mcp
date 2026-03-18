@@ -23,7 +23,9 @@ import pytest
 
 from resq_mcp.hce.models import IncidentReport, IncidentValidation, MissionParameters
 from resq_mcp.hce.service import update_mission_params, validate_incident
+from resq_mcp.hce.tools import update_mission_params as update_mission_params_tool
 from resq_mcp.hce.tools import validate_incident as validate_incident_tool
+from resq_mcp.server import incidents, missions
 
 if TYPE_CHECKING:
     from _pytest.logging import LogCaptureFixture
@@ -145,8 +147,8 @@ class TestUpdateMissionParams:
         assert result.strategy_hash.startswith("0x")
 
     def test_urgent_strategy_has_high_risk_tolerance(self) -> None:
-        """Test that urgent strategies have high risk tolerance."""
-        result = update_mission_params("DRONE-004", "URGENT-STRAT-001")
+        """Test that urgent flag produces high risk tolerance (not string injection)."""
+        result = update_mission_params("DRONE-004", "STRAT-001", is_urgent=True)
 
         assert isinstance(result, MissionParameters)
         assert result.risk_tolerance == pytest.approx(0.9)
@@ -198,7 +200,7 @@ class TestEdgeCases:
         assert result.is_confirmed
 
     def test_mission_params_urgent_strategy_has_high_risk_tolerance(self) -> None:
-        params = update_mission_params("DRONE-X", "STRAT-URGENT-FIRE-001")
+        params = update_mission_params("DRONE-X", "STRAT-FIRE-001", is_urgent=True)
         assert isinstance(params, MissionParameters)
         assert params.risk_tolerance == pytest.approx(0.9)
 
@@ -310,3 +312,167 @@ class TestValidateIncidentTool:
         assert "CONFIRMED" in log_text
         assert "Audit-Test-Source" in log_text
         assert "Testing log format completeness" in log_text
+
+
+@pytest.fixture(autouse=True)
+def clear_incident_and_mission_stores() -> None:
+    """Clear shared state stores before each test to prevent cross-test pollution."""
+    incidents.clear()
+    missions.clear()
+
+
+class TestValidateIncidentToolGuards:
+    """Tests for validate_incident idempotency, conflict, and capacity guards."""
+
+    @pytest.mark.asyncio
+    async def test_idempotent_revalidation_same_result(self) -> None:
+        """Re-submitting the same validation returns an idempotent message."""
+        val = IncidentValidation(
+            incident_id="INC-IDEM-001",
+            is_confirmed=True,
+            validation_source="Operator",
+            notes="First validation",
+        )
+        await validate_incident_tool(val)
+        result = await validate_incident_tool(val)
+        assert "already CONFIRMED" in result
+        assert "idempotent" in result
+
+    @pytest.mark.asyncio
+    async def test_conflict_guard_blocks_opposite_result(self) -> None:
+        """Re-validating with the opposite result is blocked as a conflict."""
+        confirm = IncidentValidation(
+            incident_id="INC-CONF-002",
+            is_confirmed=True,
+            validation_source="Operator-A",
+            notes="Confirmed",
+        )
+        reject = IncidentValidation(
+            incident_id="INC-CONF-002",
+            is_confirmed=False,
+            validation_source="Operator-B",
+            notes="Rejected",
+        )
+        await validate_incident_tool(confirm)
+        result = await validate_incident_tool(reject)
+        assert "Conflict" in result
+        assert "INC-CONF-002" in result
+
+    @pytest.mark.asyncio
+    async def test_capacity_guard_blocks_new_incidents(self) -> None:
+        """Raises FastMCPError when the incident store is at capacity."""
+        from fastmcp.exceptions import FastMCPError
+
+        from resq_mcp.server import MAX_INCIDENTS
+
+        # Fill the store to capacity with synthetic records
+        for i in range(MAX_INCIDENTS):
+            incidents[f"INC-FILL-{i:05d}"] = {
+                "is_confirmed": True,
+                "validation_source": "test",
+                "notes": "",
+                "validated_at": "2026-01-01T00:00:00+00:00",
+                "validated_at_mono": 0.0,
+            }
+
+        val = IncidentValidation(
+            incident_id="INC-OVERFLOW",
+            is_confirmed=True,
+            validation_source="test",
+            notes="overflow test",
+        )
+        with pytest.raises(FastMCPError, match="capacity reached"):
+            await validate_incident_tool(val)
+
+    @pytest.mark.asyncio
+    async def test_case_insensitive_incident_key_idempotency(self) -> None:
+        """Lower-case and upper-case incident IDs refer to the same record."""
+        lower_val = IncidentValidation(
+            incident_id="inc-case-001",
+            is_confirmed=True,
+            validation_source="Operator",
+            notes="Lowercase submission",
+        )
+        upper_val = IncidentValidation(
+            incident_id="INC-CASE-001",
+            is_confirmed=True,
+            validation_source="Operator",
+            notes="Uppercase re-submission",
+        )
+        await validate_incident_tool(lower_val)
+        result = await validate_incident_tool(upper_val)
+        assert "already CONFIRMED" in result or "idempotent" in result
+
+
+class TestUpdateMissionParamsTool:
+    """Tests for update_mission_params tool guards and idempotency."""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_stores_mission(self) -> None:
+        """Dispatching a mission stores it in the missions dict."""
+        await update_mission_params_tool("DRONE-T1", "STRAT-001")
+        assert "DRONE-T1" in missions
+        assert missions["DRONE-T1"]["strategy_id"] == "STRAT-001"
+
+    @pytest.mark.asyncio
+    async def test_idempotent_redispatch_returns_identical_params(self) -> None:
+        """Idempotent re-dispatch returns byte-identical MissionParameters."""
+        params1 = await update_mission_params_tool("DRONE-T2", "STRAT-002")
+        params2 = await update_mission_params_tool("DRONE-T2", "STRAT-002")
+        assert params1.mission_id == params2.mission_id
+        assert params1.strategy_hash == params2.strategy_hash
+        assert params1.risk_tolerance == pytest.approx(params2.risk_tolerance)
+        assert params1.authorized_actions == params2.authorized_actions
+
+    @pytest.mark.asyncio
+    async def test_conflict_guard_blocks_different_strategy(self) -> None:
+        """Raises FastMCPError if drone already has an active mission for a different strategy."""
+        from fastmcp.exceptions import FastMCPError
+
+        await update_mission_params_tool("DRONE-T3", "STRAT-A")
+        with pytest.raises(FastMCPError, match="already has an active mission"):
+            await update_mission_params_tool("DRONE-T3", "STRAT-B")
+
+    @pytest.mark.asyncio
+    async def test_is_urgent_escalation_via_redispatch_is_blocked(self) -> None:
+        """Re-dispatching with is_urgent=True after is_urgent=False is blocked."""
+        from fastmcp.exceptions import FastMCPError
+
+        await update_mission_params_tool("DRONE-T4", "STRAT-C", is_urgent=False)
+        with pytest.raises(FastMCPError, match="urgency"):
+            await update_mission_params_tool("DRONE-T4", "STRAT-C", is_urgent=True)
+
+    @pytest.mark.asyncio
+    async def test_capacity_guard_blocks_new_missions(self) -> None:
+        """Raises FastMCPError when the mission store is at capacity."""
+        from fastmcp.exceptions import FastMCPError
+
+        from resq_mcp.server import MAX_MISSIONS
+
+        for i in range(MAX_MISSIONS):
+            missions[f"DRONE-FILL-{i:04d}"] = {
+                "strategy_id": "STRAT-X",
+                "is_urgent": False,
+                "params": {
+                    "mission_id": f"MISS-{i:08X}",
+                    "target_sector": "Dynamic-Assigned",
+                    "authorized_actions": ["autonomous_flight"],
+                    "risk_tolerance": 0.5,
+                    "strategy_hash": "0xdeadbeef",
+                },
+                "dispatched_at": "2026-01-01T00:00:00+00:00",
+                "dispatched_at_mono": 0.0,
+            }
+
+        with pytest.raises(FastMCPError, match="capacity reached"):
+            await update_mission_params_tool("DRONE-OVERFLOW", "STRAT-NEW")
+
+    def test_urgent_string_in_strategy_id_does_not_set_high_risk(self) -> None:
+        """Regression: URGENT in strategy_id must NOT inject high risk_tolerance."""
+        params = update_mission_params("DRONE-INJ", "STRAT-URGENT-FIRE")
+        assert params.risk_tolerance == pytest.approx(0.5)
+
+    def test_urgent_flag_sets_high_risk_tolerance(self) -> None:
+        """Explicit is_urgent=True sets risk_tolerance=0.9."""
+        params = update_mission_params("DRONE-URG", "STRAT-FIRE", is_urgent=True)
+        assert params.risk_tolerance == pytest.approx(0.9)

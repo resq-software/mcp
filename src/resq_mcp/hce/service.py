@@ -108,6 +108,7 @@ def validate_incident(report: IncidentReport) -> IncidentValidation:
 def update_mission_params(
     drone_id: str,
     strategy_id: str,
+    is_urgent: bool = False,
 ) -> MissionParameters | ErrorResponse:
     """Push new authorized mission parameters to a specific drone.
 
@@ -176,8 +177,10 @@ def update_mission_params(
         f"{strategy_id}:{mission_id_raw}".encode()
     ).hexdigest()
 
-    # Determine risk tolerance based on strategy urgency
-    risk_tolerance = 0.9 if "URGENT" in strategy_id.upper() else 0.5
+    # Risk tolerance is determined by the explicit is_urgent flag, not the
+    # strategy_id string.  The previous substring check ("URGENT" in strategy_id)
+    # allowed callers to inject high-risk tolerance via a crafted strategy ID.
+    risk_tolerance = 0.9 if is_urgent else 0.5
 
     return MissionParameters(
         mission_id=f"MISS-{mission_id_raw}",

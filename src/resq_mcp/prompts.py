@@ -19,7 +19,15 @@
 # for tool parameter validation. Using PEP 563 postponed annotations causes
 # NameError when FastMCP tries to evaluate the forward references.
 
+import re
+
+from fastmcp.exceptions import FastMCPError
+
 from resq_mcp.server import mcp
+
+# Allowlist pattern for incident IDs injected into LLM prompt templates.
+# Prevents prompt injection via crafted incident_id values.
+_INCIDENT_ID_RE = re.compile(r"^[A-Z0-9\-]{1,64}$")
 
 
 @mcp.prompt()
@@ -62,8 +70,14 @@ def incident_response_plan(incident_id: str) -> str:
         - resq://drones/active -> Fleet status
         - Additional sector/swarm status tools as needed
     """
+    safe_id = incident_id.upper().strip()
+    if not _INCIDENT_ID_RE.match(safe_id):
+        raise FastMCPError(
+            f"Invalid incident_id format: {incident_id!r}. "
+            "Expected alphanumeric characters and hyphens only (e.g. INC-001)."
+        )
     return f"""
-    As a Crisis Coordinator, analyze Incident {incident_id}.
+    As a Crisis Coordinator, analyze Incident {safe_id}.
 
     1. Check `get_deployment_strategy` for this incident.
     2. Review available assets in `resq://drones/active`.

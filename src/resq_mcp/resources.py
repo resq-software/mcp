@@ -72,11 +72,21 @@ async def get_simulation_status(sim_id: str) -> str:
         msg = f"Simulation {sim_id} not found"
         raise FastMCPError(msg)
 
+    status = sim["status"]
+    progress = int((sim.get("progress") or 0) * 100)
+    if status == "failed":
+        result_info = (
+            "FAILED — simulation was cancelled or encountered an error. "
+            "Do not retry without resubmitting."
+        )
+    else:
+        result_info = sim.get("result_url", "N/A")
+
     return f"""
     Simulation ID: {sim_id}
-    Status: {sim["status"]}
-    Progress: {int((sim.get("progress") or 0) * 100)}%
-    Result: {sim.get("result_url", "N/A")}
+    Status: {status}
+    Progress: {progress}%
+    Result: {result_info}
     Parameters: {sim.get("request", {})}
     """
 

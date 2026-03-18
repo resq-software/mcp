@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
 from resq_mcp.dtsop.service import get_optimization_strategy, run_simulation
 
@@ -99,6 +101,88 @@ class TestGetOptimizationStrategy:
 
         assert result.simulation_proof_url is not None
         assert result.simulation_proof_url.startswith("neofs://")
+
+
+class TestGetDeploymentStrategyTool:
+    """Tests for the get_deployment_strategy tool's incident validation guard."""
+
+    @pytest.fixture(autouse=True)
+    def clear_incidents(self) -> None:
+        from resq_mcp.server import incidents
+        incidents.clear()
+
+    @pytest.mark.asyncio
+    async def test_unvalidated_inc_id_raises(self) -> None:
+        """INC- IDs not in the incidents store raise FastMCPError."""
+        from fastmcp.exceptions import FastMCPError
+
+        from resq_mcp.dtsop.tools import get_deployment_strategy
+
+        with pytest.raises(FastMCPError, match="not found"):
+            await get_deployment_strategy("INC-UNKNOWN-001")
+
+    @pytest.mark.asyncio
+    async def test_rejected_inc_id_raises(self) -> None:
+        """INC- IDs that were rejected raise FastMCPError (no strategy for false positives)."""
+        from fastmcp.exceptions import FastMCPError
+
+        from resq_mcp.dtsop.tools import get_deployment_strategy
+        from resq_mcp.server import incidents
+
+        incidents["INC-REJECTED-001"] = {
+            "is_confirmed": False,
+            "validation_source": "test",
+            "notes": "",
+            "validated_at": "2026-01-01T00:00:00+00:00",
+            "validated_at_mono": 0.0,
+        }
+        with pytest.raises(FastMCPError, match="rejected"):
+            await get_deployment_strategy("INC-REJECTED-001")
+
+    @pytest.mark.asyncio
+    async def test_confirmed_inc_id_returns_strategy(self) -> None:
+        """INC- IDs that are confirmed successfully return an OptimizationStrategy."""
+        from resq_mcp.dtsop.models import OptimizationStrategy
+        from resq_mcp.dtsop.tools import get_deployment_strategy
+        from resq_mcp.server import incidents
+
+        incidents["INC-CONFIRMED-001"] = {
+            "is_confirmed": True,
+            "validation_source": "test",
+            "notes": "",
+            "validated_at": "2026-01-01T00:00:00+00:00",
+            "validated_at_mono": 0.0,
+        }
+        result = await get_deployment_strategy("INC-CONFIRMED-001")
+        assert isinstance(result, OptimizationStrategy)
+
+    @pytest.mark.asyncio
+    async def test_pre_alert_id_bypasses_incident_check(self) -> None:
+        """PRE- IDs bypass incident validation and return a strategy directly."""
+        from resq_mcp.dtsop.models import OptimizationStrategy
+        from resq_mcp.dtsop.tools import get_deployment_strategy
+
+        result = await get_deployment_strategy("PRE-ABC123")
+        assert isinstance(result, OptimizationStrategy)
+
+    @pytest.mark.asyncio
+    async def test_case_insensitive_inc_id_lookup(self) -> None:
+        """Lowercase INC- ID resolves to the same confirmed record as uppercase."""
+        from resq_mcp.dtsop.models import OptimizationStrategy
+        from resq_mcp.dtsop.tools import get_deployment_strategy
+        from resq_mcp.server import incidents
+
+        # Store under uppercase key (as validate_incident would)
+        incidents["INC-CASE-001"] = {
+            "is_confirmed": True,
+            "validation_source": "test",
+            "notes": "",
+            "validated_at": "2026-01-01T00:00:00+00:00",
+            "validated_at_mono": 0.0,
+        }
+        # Query with lowercase — should not raise
+        result = await get_deployment_strategy("inc-case-001")
+        assert isinstance(result, OptimizationStrategy)
 
 
 class TestEdgeCases:

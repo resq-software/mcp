@@ -52,20 +52,27 @@ setup_telemetry()
 
 # --- Capacity & TTL limits ---
 MAX_SIMULATIONS: int = 500
-COMPLETED_TTL_SECONDS: int = 300  # evict completed sims after 5 minutes
+MAX_INCIDENTS: int = 1000
+MAX_MISSIONS: int = 200                    # active missions per session
+COMPLETED_TTL_SECONDS: int = 300           # evict completed sims after 5 minutes
+FAILED_TTL_SECONDS: int = 60              # evict failed sims sooner
+INCIDENT_TTL_SECONDS: int = 3600          # evict rejected incident records after 1 hour
+CONFIRMED_INCIDENT_TTL_SECONDS: int = 86400  # confirmed incidents retained for 24h
+MISSION_TTL_SECONDS: int = 7200           # evict stale mission records after 2h
 
 # --- Mock Data Store ---
+# NOTE: created_at uses wall-clock ISO strings (human-visible in resource output).
+#       completed_at / failed_at / validated_at_mono use time.monotonic() floats
+#       (internal TTL bookkeeping only; not exposed to callers).
 simulations: "dict[str, dict[str, Any]]" = {}
 incidents: "dict[str, dict[str, Any]]" = {}
+missions: "dict[str, dict[str, Any]]" = {}   # keyed by drone_id
 
-# Keep strong references to per-simulation tasks so they aren't garbage-collected
-# before completion (required by asyncio task semantics per RUF006).
-_sim_tasks: "set[asyncio.Task[None]]" = set()
-
-# Track which sim_ids currently have an active completion task so the poll loop
-# can recover orphaned "processing" sims (e.g. created directly in tests or if
-# a hypothetical partial-state reload leaves sims in "processing" without tasks).
-_active_processing: "set[str]" = set()
+# Maps sim_id -> active asyncio.Task, serving as both a strong task reference
+# (prevents GC) and the authoritative record of which sims have completion tasks
+# (used for orphan recovery in the poll loop).  Single structure replaces the
+# prior _sim_tasks set + _active_processing set dual-channel pattern.
+_processing_tasks: "dict[str, asyncio.Task[None]]" = {}
 
 
 @asynccontextmanager
@@ -104,6 +111,12 @@ async def lifespan(server: FastMCP) -> "AsyncGenerator[None, None]":
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await task
+    # Cancel any in-flight per-simulation tasks so they don't write to the
+    # (now-stale) simulations dict after the processor has stopped.
+    for sim_task in list(_processing_tasks.values()):
+        sim_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await sim_task
 
 
 # Initialize FastMCP
@@ -117,22 +130,46 @@ mcp = FastMCP(
 # --- Background Tasks ---
 
 
-def _cleanup_old_simulations() -> None:
-    """Evict completed simulations older than COMPLETED_TTL_SECONDS.
+def _cleanup_state() -> None:
+    """Evict stale entries from all in-memory stores.
 
-    Prevents unbounded memory growth in the simulations store by removing
-    entries that are both completed and past their TTL.
+    Simulations:
+        - completed → evict after COMPLETED_TTL_SECONDS
+        - failed    → evict after FAILED_TTL_SECONDS (shorter; clients should not retry)
+    Incidents:
+        - rejected  → evict after INCIDENT_TTL_SECONDS (1h — false positives, low value)
+        - confirmed → evict after CONFIRMED_INCIDENT_TTL_SECONDS (24h — must persist
+                      long enough for get_deployment_strategy to cross-validate them)
+    Missions:
+        - evict after MISSION_TTL_SECONDS (2h), freeing the drone for new dispatches.
     """
     now = time.monotonic()
-    to_delete = [
-        sid
-        for sid, data in list(simulations.items())
-        if data.get("status") == "completed"
-        and now - data.get("completed_at", now) > COMPLETED_TTL_SECONDS
-    ]
-    for sid in to_delete:
-        del simulations[sid]
-        logger.debug("Evicted completed simulation %s", sid)
+
+    for sid, data in list(simulations.items()):
+        status = data.get("status")
+        if status == "completed" and now - data.get("completed_at", now) > COMPLETED_TTL_SECONDS:
+            del simulations[sid]
+            logger.debug("Evicted completed simulation %s", sid)
+        elif status == "failed" and now - data.get("failed_at", now) > FAILED_TTL_SECONDS:
+            del simulations[sid]
+            logger.debug("Evicted failed simulation %s", sid)
+
+    for iid, data in list(incidents.items()):
+        age = now - data.get("validated_at_mono", now)
+        # Rejected incidents (false positives) are low-value — evict quickly.
+        # Confirmed incidents must persist so get_deployment_strategy can validate
+        # them across a full response workflow; give them a 24h window.
+        if data.get("is_confirmed") is False and age > INCIDENT_TTL_SECONDS:
+            del incidents[iid]
+            logger.debug("Evicted rejected incident %s", iid)
+        elif data.get("is_confirmed") is True and age > CONFIRMED_INCIDENT_TTL_SECONDS:
+            del incidents[iid]
+            logger.debug("Evicted old confirmed incident %s", iid)
+
+    for did, data in list(missions.items()):
+        if now - data.get("dispatched_at_mono", now) > MISSION_TTL_SECONDS:
+            del missions[did]
+            logger.debug("Evicted stale mission for drone %s", did)
 
 
 async def _process_simulation(server: FastMCP, sim_id: str, data: "dict[str, Any]") -> None:
@@ -142,31 +179,32 @@ async def _process_simulation(server: FastMCP, sim_id: str, data: "dict[str, Any
     by a single job's 3-second processing window (fixes the sequential-sleep DoS).
 
     State Machine:
-        processing -> completed (after 3 s)
-        processing -> failed    (on CancelledError, e.g. server shutdown mid-run)
+        processing -> completed (after 3 s, sets completed_at for TTL eviction)
+        processing -> failed    (on CancelledError — sets failed_at for TTL eviction,
+                                 clears progress so clients see 0% not a stuck 50%)
     """
-    _active_processing.add(sim_id)
     try:
         await asyncio.sleep(3)
-        # Guard: entry may have been evicted if server restarted or was flushed
+        # Guard: entry may have been evicted while we slept
         if simulations.get(sim_id) is not data:
             return
         data["status"] = "completed"
         data["progress"] = 1.0
         data["result_url"] = f"neofs://sim_results/{sim_id}.json"
-        data["completed_at"] = time.monotonic()
+        data["completed_at"] = time.monotonic()  # monotonic float; TTL use only
         logger.info("Simulation %s COMPLETED", sim_id)
         try:
             await server.notify_resource_updated(f"resq://simulations/{sim_id}")  # type: ignore[attr-defined]
         except Exception:
             logger.debug("Failed to notify for %s", sim_id, exc_info=True)
     except asyncio.CancelledError:
-        # Mark failed so clients don't poll forever on a zombie entry
         if simulations.get(sim_id) is data:
             data["status"] = "failed"
+            data["progress"] = 0.0   # clear stuck 50% so clients see correct state
+            data["failed_at"] = time.monotonic()
         raise
     finally:
-        _active_processing.discard(sim_id)
+        _processing_tasks.pop(sim_id, None)
 
 
 async def simulation_processor(server: FastMCP) -> None:
@@ -189,26 +227,24 @@ async def simulation_processor(server: FastMCP) -> None:
     """
     while True:
         await asyncio.sleep(2)
-        _cleanup_old_simulations()
+        _cleanup_state()
         for sim_id, data in list(simulations.items()):
             if data["status"] == "pending":
                 data["status"] = "processing"
                 data["progress"] = 0.5
                 logger.info("Simulation %s moved to PROCESSING", sim_id)
                 task = asyncio.create_task(_process_simulation(server, sim_id, data))
-                _sim_tasks.add(task)
-                task.add_done_callback(_sim_tasks.discard)
+                _processing_tasks[sim_id] = task
                 try:
                     await server.notify_resource_updated(f"resq://simulations/{sim_id}")  # type: ignore[attr-defined]
                 except Exception:
                     logger.debug("Failed to notify for %s", sim_id, exc_info=True)
-            elif data["status"] == "processing" and sim_id not in _active_processing:
-                # Orphan recovery: a sim is in "processing" with no active task
+            elif data["status"] == "processing" and sim_id not in _processing_tasks:
+                # Orphan recovery: sim is "processing" with no active task
                 # (e.g. created directly in tests or after partial-state replay).
                 logger.debug("Recovering orphaned processing simulation %s", sim_id)
                 task = asyncio.create_task(_process_simulation(server, sim_id, data))
-                _sim_tasks.add(task)
-                task.add_done_callback(_sim_tasks.discard)
+                _processing_tasks[sim_id] = task
 
 
 # Register tools, resources, and prompts

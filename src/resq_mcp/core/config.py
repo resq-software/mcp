@@ -29,6 +29,8 @@ Environment variables:
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -67,6 +69,20 @@ class Settings(BaseSettings):
     SAFE_MODE: bool = Field(
         default=True,
         description="If True, side-effecting tools are disabled or mocked safely",
+    )
+
+    # Telemetry
+    TELEMETRY_BACKEND: Literal["console", "jaeger", "otlp", "none"] = Field(
+        default="none",
+        description="Telemetry backend to use",
+    )
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = Field(
+        default="http://localhost:4317",
+        description="OTLP exporter endpoint",
+    )
+    OTEL_SERVICE_NAME: str = Field(
+        default="resq-mcp",
+        description="Service name for telemetry",
     )
 
 

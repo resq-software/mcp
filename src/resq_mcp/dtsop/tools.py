@@ -28,7 +28,7 @@ from fastmcp.exceptions import FastMCPError
 from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
 from resq_mcp.dtsop.service import get_optimization_strategy
 from resq_mcp.dtsop.service import run_simulation as trigger_sim
-from resq_mcp.server import MAX_SIMULATIONS, mcp, simulations
+from resq_mcp.server import MAX_SIMULATIONS, incidents, mcp, simulations
 
 logger = logging.getLogger("resq-mcp")
 
@@ -86,7 +86,10 @@ async def run_simulation(request: SimulationRequest, ctx: Context | None = None)
     """
     logger.info("Received Simulation Request: %s", request.scenario_id)
 
-    if len(simulations) >= MAX_SIMULATIONS:
+    active_sim_count = sum(
+        1 for d in simulations.values() if d.get("status") in ("pending", "processing")
+    )
+    if active_sim_count >= MAX_SIMULATIONS:
         raise FastMCPError(
             f"Simulation capacity reached ({MAX_SIMULATIONS} active jobs). "
             "Wait for existing simulations to complete before submitting new ones."
@@ -146,4 +149,22 @@ async def get_deployment_strategy(incident_id: str) -> OptimizationStrategy:
         Strategy linked to blockchain for immutable audit trail.
         After approval, use update_mission_params to push to drones.
     """
+    # Validate confirmed incident IDs against the incidents store.
+    # PRE- (PDIE pre-alert) and other non-INC- IDs bypass this check since they
+    # are not submitted through validate_incident.
+    if incident_id.upper().startswith("INC-"):
+        # Normalise to uppercase so "inc-123" and "INC-123" resolve to the same record.
+        # validate_incident also normalises keys to uppercase on write.
+        state = incidents.get(incident_id.upper())
+        if state is None:
+            raise FastMCPError(
+                f"Incident {incident_id} not found. "
+                "Submit it via validate_incident before requesting a strategy."
+            )
+        if not state["is_confirmed"]:
+            raise FastMCPError(
+                f"Incident {incident_id} was rejected. "
+                "Deployment strategies are only generated for confirmed incidents."
+            )
+
     return get_optimization_strategy(incident_id)
