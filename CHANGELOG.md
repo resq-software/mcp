@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-03-18)
+
+### Continuous Integration
+
+- Drop Python 3.14-dev from test matrix (not yet supported by uv)
+  ([`b41ff8c`](https://github.com/resq-software/mcp/commit/b41ff8c0da34b878d7bc66ada96325544cb16654))
+
+### Features
+
+- **core**: 📡 implement telemetry subsystem and enhance server safety
+  ([`46e558b`](https://github.com/resq-software/mcp/commit/46e558b71f0289c27e0696d5500a1a68f35ea2b5))
+
+Implement a comprehensive OpenTelemetry-based telemetry subsystem and strengthen server-side
+  operational guards.
+
+- Implement OpenTelemetry subsystem with PII scrubbing and async decorators - Add mission parameter
+  tools and idempotency guards for incident validation - Refactor simulation processor for
+  concurrent execution and orphan recovery - Introduce capacity limits and TTL-based eviction for
+  simulation state - Improve security using timing-attack resistant credential comparison - Overhaul
+  documentation including README, AGENTS.md, and CLAUDE.md - Add environment variable validation on
+  server startup
+
+
 ## v0.3.4 (2026-03-17)
 
 ### Bug Fixes
