@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-03-18)
+
+### Features
+
+- 🚀 implement telemetry and harden tool security guards
+  ([`48edde3`](https://github.com/resq-software/mcp/commit/48edde32aaae939d28f7d57299933178840ab3ac))
+
+- Integrate OpenTelemetry SDK with OTLP and console backend support - Add TTL-based eviction for
+  incidents, missions, and simulations - Implement capacity, conflict, and idempotency guards for
+  tools - Harden prompts against injection using incident ID validation - Switch to explicit urgency
+  flags for mission risk tolerance
+
+BREAKING CHANGE: get_deployment_strategy now requires incidents to be validated via
+  validate_incident before a strategy can be requested.
+
+### Breaking Changes
+
+- Get_deployment_strategy now requires incidents to be validated via validate_incident before a
+  strategy can be requested.
+
+
 ## v0.4.0 (2026-03-18)
 
 ### Continuous Integration
