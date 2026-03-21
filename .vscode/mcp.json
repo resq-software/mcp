@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "resq-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "resq-mcp"],
+      "env": {
+        "RESQ_API_KEY": "resq-dev-token",
+        "RESQ_SAFE_MODE": "true"
+      }
+    }
+  }
+}
