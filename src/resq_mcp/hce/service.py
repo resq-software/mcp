@@ -173,9 +173,7 @@ def update_mission_params(
     # Hash is deterministic given (strategy_id, mission_id) — reproducible for audit lookups.
     # Previously included datetime.now() which made the hash non-deterministic and
     # impossible to verify against any real blockchain record.
-    strategy_hash = hashlib.sha256(
-        f"{strategy_id}:{mission_id_raw}".encode()
-    ).hexdigest()
+    strategy_hash = hashlib.sha256(f"{strategy_id}:{mission_id_raw}".encode()).hexdigest()
 
     # Risk tolerance is determined by the explicit is_urgent flag, not the
     # strategy_id string.  The previous substring check ("URGENT" in strategy_id)

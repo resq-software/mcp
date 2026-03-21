@@ -53,12 +53,12 @@ setup_telemetry()
 # --- Capacity & TTL limits ---
 MAX_SIMULATIONS: int = 500
 MAX_INCIDENTS: int = 1000
-MAX_MISSIONS: int = 200                    # active missions per session
-COMPLETED_TTL_SECONDS: int = 300           # evict completed sims after 5 minutes
-FAILED_TTL_SECONDS: int = 60              # evict failed sims sooner
-INCIDENT_TTL_SECONDS: int = 3600          # evict rejected incident records after 1 hour
+MAX_MISSIONS: int = 200  # active missions per session
+COMPLETED_TTL_SECONDS: int = 300  # evict completed sims after 5 minutes
+FAILED_TTL_SECONDS: int = 60  # evict failed sims sooner
+INCIDENT_TTL_SECONDS: int = 3600  # evict rejected incident records after 1 hour
 CONFIRMED_INCIDENT_TTL_SECONDS: int = 86400  # confirmed incidents retained for 24h
-MISSION_TTL_SECONDS: int = 7200           # evict stale mission records after 2h
+MISSION_TTL_SECONDS: int = 7200  # evict stale mission records after 2h
 
 # --- Mock Data Store ---
 # NOTE: created_at uses wall-clock ISO strings (human-visible in resource output).
@@ -66,7 +66,7 @@ MISSION_TTL_SECONDS: int = 7200           # evict stale mission records after 2h
 #       (internal TTL bookkeeping only; not exposed to callers).
 simulations: "dict[str, dict[str, Any]]" = {}
 incidents: "dict[str, dict[str, Any]]" = {}
-missions: "dict[str, dict[str, Any]]" = {}   # keyed by drone_id
+missions: "dict[str, dict[str, Any]]" = {}  # keyed by drone_id
 
 # Maps sim_id -> active asyncio.Task, serving as both a strong task reference
 # (prevents GC) and the authoritative record of which sims have completion tasks
@@ -200,7 +200,7 @@ async def _process_simulation(server: FastMCP, sim_id: str, data: "dict[str, Any
     except asyncio.CancelledError:
         if simulations.get(sim_id) is data:
             data["status"] = "failed"
-            data["progress"] = 0.0   # clear stuck 50% so clients see correct state
+            data["progress"] = 0.0  # clear stuck 50% so clients see correct state
             data["failed_at"] = time.monotonic()
         raise
     finally:

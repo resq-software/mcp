@@ -225,6 +225,7 @@ class TestCleanupState:
     @pytest.fixture(autouse=True)
     def clear_all_stores(self) -> None:
         from resq_mcp.server import incidents, missions, simulations
+
         simulations.clear()
         incidents.clear()
         missions.clear()
@@ -310,9 +311,13 @@ class TestCleanupState:
         missions["DRONE-OLD"] = {
             "strategy_id": "STRAT-X",
             "is_urgent": False,
-            "params": {"mission_id": "MISS-00000001", "strategy_hash": "0xdeadbeef",
-                       "target_sector": "Dynamic-Assigned", "authorized_actions": [],
-                       "risk_tolerance": 0.5},
+            "params": {
+                "mission_id": "MISS-00000001",
+                "strategy_hash": "0xdeadbeef",
+                "target_sector": "Dynamic-Assigned",
+                "authorized_actions": [],
+                "risk_tolerance": 0.5,
+            },
             "dispatched_at": "2026-01-01T00:00:00+00:00",
             "dispatched_at_mono": time.monotonic() - MISSION_TTL_SECONDS - 1,
         }
@@ -327,9 +332,13 @@ class TestCleanupState:
         missions["DRONE-ACTIVE"] = {
             "strategy_id": "STRAT-Y",
             "is_urgent": False,
-            "params": {"mission_id": "MISS-00000002", "strategy_hash": "0xcafebabe",
-                       "target_sector": "Dynamic-Assigned", "authorized_actions": [],
-                       "risk_tolerance": 0.5},
+            "params": {
+                "mission_id": "MISS-00000002",
+                "strategy_hash": "0xcafebabe",
+                "target_sector": "Dynamic-Assigned",
+                "authorized_actions": [],
+                "risk_tolerance": 0.5,
+            },
             "dispatched_at": "2026-01-01T00:00:00+00:00",
             "dispatched_at_mono": time.monotonic() - 60,
         }

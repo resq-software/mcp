@@ -102,8 +102,8 @@ async def validate_incident(val: IncidentValidation) -> str:
         "is_confirmed": val.is_confirmed,
         "validation_source": val.validation_source,
         "notes": val.notes,
-        "validated_at": datetime.now(UTC).isoformat(),   # human-readable
-        "validated_at_mono": time.monotonic(),            # TTL bookkeeping
+        "validated_at": datetime.now(UTC).isoformat(),  # human-readable
+        "validated_at_mono": time.monotonic(),  # TTL bookkeeping
     }
     logger.info(
         "Incident %s %s by %s",
@@ -173,16 +173,17 @@ async def update_mission_params(
         )
 
     from resq_mcp.core.models import ErrorResponse
+
     result = _update_mission_params(drone_id, strategy_id, is_urgent)
     if isinstance(result, ErrorResponse):
         raise FastMCPError(result.message)
 
     missions[drone_id] = {
         "strategy_id": strategy_id,
-        "is_urgent": is_urgent,            # retained for is_urgent mismatch guard
-        "params": result.model_dump(),     # snapshot for byte-identical idempotent return
+        "is_urgent": is_urgent,  # retained for is_urgent mismatch guard
+        "params": result.model_dump(),  # snapshot for byte-identical idempotent return
         "dispatched_at": datetime.now(UTC).isoformat(),
-        "dispatched_at_mono": time.monotonic(),   # monotonic float; TTL eviction
+        "dispatched_at_mono": time.monotonic(),  # monotonic float; TTL eviction
     }
     logger.info(
         "Pushing mission params to drone %s for strategy %s (urgent=%s)",

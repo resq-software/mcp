@@ -134,9 +134,7 @@ def _sanitize_attrs(attrs: dict[str, Any]) -> dict[str, Any]:
         ):
             clean[key] = "[REDACTED]"
             continue
-        if key_lower in ("latitude", "longitude", "lat", "lon", "lng") and isinstance(
-            value, float
-        ):
+        if key_lower in ("latitude", "longitude", "lat", "lon", "lng") and isinstance(value, float):
             clean[key] = round(value, 2)
             continue
         if isinstance(value, str):
@@ -220,6 +218,7 @@ def setup_telemetry() -> None:
         try:
             from opentelemetry import trace as _api_trace
             from opentelemetry.metrics import get_meter_provider as _get_mp
+
             tracer = _api_trace.get_tracer("resq-mcp", settings.VERSION)
             meter = _get_mp().get_meter("resq-mcp", settings.VERSION)
         except ImportError:
@@ -232,7 +231,9 @@ class _NoOpSpan:
     def set_status(self, _status: Any, _description: str | None = None) -> None: ...
     def record_exception(self, _exception: BaseException) -> None: ...
     def end(self) -> None: ...
-    def __enter__(self) -> _NoOpSpan: return self
+    def __enter__(self) -> _NoOpSpan:
+        return self
+
     def __exit__(self, *args: object) -> None: ...
 
 
@@ -274,9 +275,7 @@ class _Metrics:
     @property
     def tool_invocations(self) -> Any:
         if self._tool_invocations is None:
-            self._tool_invocations = meter.create_counter(
-                "resq.mcp.tool.invocations", unit="1"
-            )
+            self._tool_invocations = meter.create_counter("resq.mcp.tool.invocations", unit="1")
         return self._tool_invocations
 
     @property
@@ -330,7 +329,9 @@ def _apply_trace(
 ) -> Any:
     resolved_name = span_name or f"{func.__module__}.{func.__qualname__}"
     import inspect
+
     if inspect.iscoroutinefunction(func):
+
         @functools.wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             with tracer.start_as_current_span(resolved_name) as span_obj:
@@ -353,6 +354,7 @@ def _apply_trace(
                     metrics.tool_duration.record(time.monotonic() - start, {"tool": resolved_name})
                     metrics.tool_invocations.add(1, {"tool": resolved_name})
                     metrics.active_spans.add(-1)
+
         return async_wrapper
 
     @functools.wraps(func)
@@ -377,6 +379,7 @@ def _apply_trace(
                 metrics.tool_duration.record(time.monotonic() - start, {"tool": resolved_name})
                 metrics.tool_invocations.add(1, {"tool": resolved_name})
                 metrics.active_spans.add(-1)
+
     return sync_wrapper
 
 

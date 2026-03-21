@@ -109,6 +109,7 @@ class TestGetDeploymentStrategyTool:
     @pytest.fixture(autouse=True)
     def clear_incidents(self) -> None:
         from resq_mcp.server import incidents
+
         incidents.clear()
 
     @pytest.mark.asyncio
