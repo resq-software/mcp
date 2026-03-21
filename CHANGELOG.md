@@ -1,6 +1,43 @@
 # CHANGELOG
 
 
+## v1.0.2 (2026-03-21)
+
+### Bug Fixes
+
+- **test**: Resolve ruff lint violations in test files
+  ([`f1e5d71`](https://github.com/resq-software/mcp/commit/f1e5d718dd813bdda00e729d27137f7f4f065195))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Documentation
+
+- Add VS Code MCP config and expand README
+  ([`497a4cd`](https://github.com/resq-software/mcp/commit/497a4cda968974b8c9924c184fae24edc4058859))
+
+Add .vscode/mcp.json for out-of-the-box MCP server discovery in VS Code and Cursor. Expand README
+  with VS Code/Cursor setup guide, module overview, full tool/resource/prompt reference tables, and
+  example workflows.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add tests to reach 90% coverage threshold
+  ([`a30d543`](https://github.com/resq-software/mcp/commit/a30d543c6f0c433591d98612495809b9310ec341))
+
+Coverage: 79.78% → 91.61%
+
+New test coverage for: - MCPErrorFormatter: KeyError, TimeoutError, unknown errors, context
+  redaction, http_status - Timeout: NaN/inf handling, invalid env var fallback - Telemetry:
+  sanitize_attrs, redact_log_message, truncate, NoOp classes, Metrics lazy init, trace decorator
+  (sync/async + exceptions), span context manager, log_event, get_trace_context, shutdown - Server:
+  _process_simulation (complete, evicted, notify failure, cancelled), lifespan start/stop,
+  simulation capacity limit - Resources: failed simulation status
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v1.0.1 (2026-03-21)
 
 ### Bug Fixes
