@@ -2152,7 +2152,7 @@ wheels = [
 
 [[package]]
 name = "resq-mcp"
-version = "0.3.4"
+version = "1.0.4"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

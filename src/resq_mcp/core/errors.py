@@ -49,7 +49,7 @@ class MCPErrorFormatter:
             error_response["error"]["suggestion"] = suggestion
         if http_status is not None:
             error_response["error"]["http_status"] = http_status
-        return json.dumps(error_response)
+        return json.dumps(error_response, default=str)
 
     @staticmethod
     def from_exception(

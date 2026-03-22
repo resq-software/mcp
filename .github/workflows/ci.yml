@@ -101,7 +101,7 @@ jobs:
   test-pypi:
     name: TestPyPI Publish
     needs: [build-verify]
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     environment: test-pypi
     permissions:

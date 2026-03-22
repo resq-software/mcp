@@ -93,9 +93,14 @@ jobs:
         with:
           ref: ${{ needs.release.outputs.tag }}
 
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist/
+
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
-          path: .
+          path: dist/
           format: cyclonedx-json
           output-file: sbom.cyclonedx.json
 
@@ -106,7 +111,7 @@ jobs:
 
   publish-pypi:
     name: Publish to PyPI
-    needs: [release, build]
+    needs: [release, build, sign, attestation]
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     # TODO: Switch to OIDC once Trusted Publisher is configured on pypi.org
@@ -195,6 +200,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           for f in dist/*.whl dist/*.tar.gz; do
+            echo "Verifying attestation for $(basename "$f")..."
             gh attestation verify "$f" --repo "${{ github.repository }}"
           done
 

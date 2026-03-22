@@ -32,19 +32,7 @@ jobs:
             standalone/ \
             monorepo/libs/python/mcp/
 
-      - name: Sync directly to monorepo
-        working-directory: monorepo
-        run: |
-          git config user.name "resq-sync[bot]"
-          git config user.email "sync@resq.software"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to sync"
-            exit 0
-          fi
-          SHORT="${STANDALONE_SHA:0:7}"
-          git commit -m "chore(mcp): sync from resq-software/mcp@${SHORT}"
-      - name: Sync directly to monorepo
+      - name: Commit and push to monorepo
         env:
           STANDALONE_SHA: ${{ github.sha }}
         working-directory: monorepo

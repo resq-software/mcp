@@ -47,8 +47,8 @@ class VulnerabilityMap(BaseModel):
     sector_id: str
     population_density: Literal["low", "medium", "high"]
     critical_infrastructure: list[str]
-    flood_risk: float
-    fire_risk: float
+    flood_risk: float = Field(ge=0.0, le=1.0)
+    fire_risk: float = Field(ge=0.0, le=1.0)
     last_updated: datetime = Field(default_factory=_utc_now)
 
 
@@ -82,7 +82,7 @@ class PreAlert(BaseModel):
     alert_id: str
     sector_id: str
     predicted_disaster_type: str
-    probability: float
-    forecast_horizon_hours: int
+    probability: float = Field(ge=0.0, le=1.0)
+    forecast_horizon_hours: int = Field(gt=0)
     vulnerability_context: VulnerabilityMap
     generated_at: datetime = Field(default_factory=_utc_now)
