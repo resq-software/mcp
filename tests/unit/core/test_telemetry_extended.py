@@ -32,11 +32,13 @@ class TestSanitizeAttrs:
     def test_redacts_sensitive_keys(self) -> None:
         from resq_mcp.core.telemetry import _sanitize_attrs
 
-        result = _sanitize_attrs({
-            "api_key": "sk-12345",
-            "auth_token": "abc",
-            "safe": "hello world",
-        })
+        result = _sanitize_attrs(
+            {
+                "api_key": "sk-12345",
+                "auth_token": "abc",
+                "safe": "hello world",
+            }
+        )
         assert result["api_key"] == "[REDACTED]"
         assert result["auth_token"] == "[REDACTED]"  # noqa: S105
         assert result["safe"] == "hello world"
@@ -44,9 +46,11 @@ class TestSanitizeAttrs:
     def test_redacts_bearer_in_string_values(self) -> None:
         from resq_mcp.core.telemetry import _sanitize_attrs
 
-        result = _sanitize_attrs({
-            "header": "Bearer eyJhbGci.payload.sig",
-        })
+        result = _sanitize_attrs(
+            {
+                "header": "Bearer eyJhbGci.payload.sig",
+            }
+        )
         assert "eyJhbGci" not in result["header"]
 
 

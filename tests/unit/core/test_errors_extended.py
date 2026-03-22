@@ -34,9 +34,7 @@ class TestMCPErrorFormatterExtended:
     def test_from_exception_key_error(self) -> None:
         from resq_mcp.core.errors import MCPErrorFormatter
 
-        result = MCPErrorFormatter.from_exception(
-            KeyError("missing_field"), "fetch data"
-        )
+        result = MCPErrorFormatter.from_exception(KeyError("missing_field"), "fetch data")
         parsed = json.loads(result)
         assert parsed["error"]["type"] == "missing_data"
         assert parsed["error"]["suggestion"] == "The requested resource was not found"
@@ -54,9 +52,7 @@ class TestMCPErrorFormatterExtended:
     def test_from_exception_unknown_error(self) -> None:
         from resq_mcp.core.errors import MCPErrorFormatter
 
-        result = MCPErrorFormatter.from_exception(
-            RuntimeError("unexpected"), "process request"
-        )
+        result = MCPErrorFormatter.from_exception(RuntimeError("unexpected"), "process request")
         parsed = json.loads(result)
         assert parsed["error"]["type"] == "unknown_error"
         assert "suggestion" not in parsed["error"]
