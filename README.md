@@ -205,6 +205,9 @@ Control server behavior via environment variables or a `.env` file:
 | `RESQ_PORT` | Port for SSE (networked) mode | `8000` |
 | `RESQ_HOST` | Host to bind the SSE server | `0.0.0.0` |
 | `RESQ_DEBUG` | Enable verbose logging | `false` |
+| `RESQ_TELEMETRY_BACKEND` | Observability backend (`none`, `console`, `jaeger`, `otlp`) | `none` |
+| `RESQ_OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP exporter endpoint (when backend is `otlp`) | `http://localhost:4317` |
+| `RESQ_OTEL_SERVICE_NAME` | Service name reported to the telemetry backend | `resq-mcp` |
 
 > **Note**: `RESQ_API_KEY` defaults to `resq-dev-token` for local development. No external token is needed to run the server — it works out of the box.
 
