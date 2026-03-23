@@ -1,6 +1,55 @@
 # CHANGELOG
 
 
+## v1.1.2 (2026-03-23)
+
+### Bug Fixes
+
+- **ci**: Skip TestPyPI publish for dependabot PRs
+  ([`1e31d0c`](https://github.com/resq-software/mcp/commit/1e31d0cebd5561fd5bc03d886dba7186179c3dca))
+
+Dependabot PRs only change workflow YAML, not Python code. The OIDC Trusted Publisher on TestPyPI
+  isn't configured for dependabot, causing invalid-publisher failures that block CI status checks.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **deps**: Bump pascalgn/size-label-action ([#8](https://github.com/resq-software/mcp/pull/8),
+  [`ee8b496`](https://github.com/resq-software/mcp/commit/ee8b496d5481db2434fff8fd6a57340c054d5672))
+
+Bumps the actions-minor-patch group with 1 update:
+  [pascalgn/size-label-action](https://github.com/pascalgn/size-label-action).
+
+Updates `pascalgn/size-label-action` from 0.5.5 to 0.5.7 - [Release
+  notes](https://github.com/pascalgn/size-label-action/releases) -
+  [Commits](https://github.com/pascalgn/size-label-action/compare/f8edde36b3be04b4f65dcfead05dc8691b374348...56b489b027932ec0cf60438a1a5f1a19c8fc71ff)
+
+--- updated-dependencies: - dependency-name: pascalgn/size-label-action dependency-version: 0.5.7
+
+dependency-type: direct:production
+
+update-type: version-update:semver-patch
+
+dependency-group: actions-minor-patch ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+### Code Style
+
+- Format test_errors_extended and test_telemetry_extended
+  ([`ca9ccfb`](https://github.com/resq-software/mcp/commit/ca9ccfbed97f372f69a21b34b93d1702b5af7d26))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Documentation
+
+- Add missing OTEL telemetry env vars to configuration table
+  ([`8f4160c`](https://github.com/resq-software/mcp/commit/8f4160cdc92a576b8af9dcb2cdf8e46f2e87b1ee))
+
+
 ## v1.1.1 (2026-03-22)
 
 ### Bug Fixes
