@@ -18,7 +18,7 @@ version = "1.1.2"
 description = "FastMCP server exposing ResQ platform capabilities to AI clients"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
-readme = "../../README.md"
+readme = "README.md"
 authors = [{ name = "ResQ Team" }]
 keywords = ["mcp", "drone", "disaster-response", "fastmcp", "resq"]
 classifiers = [
