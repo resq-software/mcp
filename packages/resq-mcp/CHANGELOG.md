@@ -1,12 +1,53 @@
 # CHANGELOG
 
 
+## v1.2.0 (2026-03-27)
+
+### Bug Fixes
+
+- **ci**: Resolve Python 3.13 OutsideDestinationError for readme path
+  ([`09ce6b8`](https://github.com/resq-software/pypi/commit/09ce6b83e96a5f418075d23d615a2c5343d54d98))
+
+### Chores
+
+- Update repo references after rename mcp → pypi
+  ([`c826660`](https://github.com/resq-software/pypi/commit/c826660f7b911a9ca973150e4c6064f6afbf430d))
+
+### Features
+
+- Add resq-dsa package — zero-dependency DSA library
+  ([`304bf92`](https://github.com/resq-software/pypi/commit/304bf92d6f32ec75f26e9a3a4ec3cbab8711e778))
+
+Bloom filter, Count-Min sketch, Graph (BFS/Dijkstra/A*), Bounded Heap, Trie + Rabin-Karp. Python
+  3.11+, zero dependencies.
+
+### Refactoring
+
+- Convert to packages/ workspace layout
+  ([`37c8acd`](https://github.com/resq-software/pypi/commit/37c8acde188afb286399c2d83832eec338b6738e))
+
+Move resq-mcp into packages/resq-mcp/ to support multiple Python packages in this repo. All
+  workflows updated.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add algorithmic complexity verification tests
+  ([`596d171`](https://github.com/resq-software/pypi/commit/596d1718b1c3b83455164d0f4498fb08373d3de5))
+
+Uses big_o to empirically verify Big-O guarantees: BloomFilter O(1), BoundedHeap O(log n), Graph
+  Dijkstra O(E log V), BFS O(V+E), Trie O(L), CountMinSketch O(1).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v1.1.2 (2026-03-23)
 
 ### Bug Fixes
 
 - **ci**: Skip TestPyPI publish for dependabot PRs
-  ([`1e31d0c`](https://github.com/resq-software/mcp/commit/1e31d0cebd5561fd5bc03d886dba7186179c3dca))
+  ([`1e31d0c`](https://github.com/resq-software/pypi/commit/1e31d0cebd5561fd5bc03d886dba7186179c3dca))
 
 Dependabot PRs only change workflow YAML, not Python code. The OIDC Trusted Publisher on TestPyPI
   isn't configured for dependabot, causing invalid-publisher failures that block CI status checks.
@@ -15,8 +56,8 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 
 ### Chores
 
-- **deps**: Bump pascalgn/size-label-action ([#8](https://github.com/resq-software/mcp/pull/8),
-  [`ee8b496`](https://github.com/resq-software/mcp/commit/ee8b496d5481db2434fff8fd6a57340c054d5672))
+- **deps**: Bump pascalgn/size-label-action ([#8](https://github.com/resq-software/pypi/pull/8),
+  [`ee8b496`](https://github.com/resq-software/pypi/commit/ee8b496d5481db2434fff8fd6a57340c054d5672))
 
 Bumps the actions-minor-patch group with 1 update:
   [pascalgn/size-label-action](https://github.com/pascalgn/size-label-action).
@@ -40,14 +81,14 @@ Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.c
 ### Code Style
 
 - Format test_errors_extended and test_telemetry_extended
-  ([`ca9ccfb`](https://github.com/resq-software/mcp/commit/ca9ccfbed97f372f69a21b34b93d1702b5af7d26))
+  ([`ca9ccfb`](https://github.com/resq-software/pypi/commit/ca9ccfbed97f372f69a21b34b93d1702b5af7d26))
 
 Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 
 ### Documentation
 
 - Add missing OTEL telemetry env vars to configuration table
-  ([`8f4160c`](https://github.com/resq-software/mcp/commit/8f4160cdc92a576b8af9dcb2cdf8e46f2e87b1ee))
+  ([`8f4160c`](https://github.com/resq-software/pypi/commit/8f4160cdc92a576b8af9dcb2cdf8e46f2e87b1ee))
 
 
 ## v1.1.1 (2026-03-22)
@@ -286,7 +327,8 @@ Signed-off-by: dependabot[bot] <support@github.com>
 
 Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
 
-- **deps**: Bump docker/login-action from 3 to 4 ([#5](https://github.com/resq-software/pypi/pull/5),
+- **deps**: Bump docker/login-action from 3 to 4
+  ([#5](https://github.com/resq-software/pypi/pull/5),
   [`8fc2f3a`](https://github.com/resq-software/pypi/commit/8fc2f3ade2778ac00533cbb88744434ae173c1d5))
 
 Bumps [docker/login-action](https://github.com/docker/login-action) from 3 to 4. - [Release

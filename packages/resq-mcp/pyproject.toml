@@ -14,7 +14,7 @@
 
 [project]
 name = "resq-mcp"
-version = "1.1.2"
+version = "1.2.0"
 description = "FastMCP server exposing ResQ platform capabilities to AI clients"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
