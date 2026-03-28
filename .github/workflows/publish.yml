@@ -61,7 +61,7 @@ jobs:
         run: uv run twine check dist/*
         working-directory: packages/resq-mcp
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: dist
           path: packages/resq-mcp/dist/
@@ -82,7 +82,7 @@ jobs:
         with:
           inputs: ./dist/*.tar.gz ./dist/*.whl
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: dist-signed
           path: dist/
@@ -108,7 +108,7 @@ jobs:
           format: cyclonedx-json
           output-file: sbom.cyclonedx.json
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: sbom
           path: sbom.cyclonedx.json
