@@ -18,11 +18,13 @@ permissions:
   contents: read
   security-events: write
   pull-requests: read
+  actions: read
 
 jobs:
   scan:
-    uses: resq-software/.github/.github/workflows/security-scan.yml@main
+    uses: resq-software/.github/.github/workflows/security-scan.yml@ee2001974be1e5610cff3a2c669cfab95c7415e7 # main
     with:
       languages: '["python","actions"]'
       enable-semgrep: true
-    secrets: inherit
+    secrets:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
