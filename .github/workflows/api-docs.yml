@@ -351,6 +351,80 @@ jobs:
           rm -rf "${target:?}"/*
           cp -R "${OUTPUT_DIR}/." "$target/"
 
+      - name: Splice _pages.json into docs.json nav
+        # Mintlify only routes pages registered in docs.json. The
+        # _pages.json artifact lists every generated Markdown path;
+        # rewrite the matching language sub-group under the
+        # 'Generated API Reference' group so all pages are
+        # discoverable, in-content cross-links resolve, and direct
+        # URLs work.
+        working-directory: docs-checkout
+        run: |
+          python3 - <<'PYINNER'
+          import json
+          import pathlib
+
+          PREFIX = "sdks/python/api"
+          LANG_LABEL = "Python"
+
+          docs_path = pathlib.Path("docs.json")
+          docs = json.loads(docs_path.read_text())
+          pages_path = pathlib.Path(PREFIX) / "_pages.json"
+          if not pages_path.exists():
+              raise SystemExit(f"missing {pages_path}")
+          raw = json.loads(pages_path.read_text())
+
+          # Build hierarchical groups by path segments. Each
+          # `<dir>/README` becomes the dir's group entry rather than
+          # a duplicate leaf.
+          tree: dict = {}
+
+          def insert(node, parts, full_id):
+              if len(parts) == 1:
+                  node.setdefault("_files", []).append((parts[0], full_id))
+                  return
+              head, *rest = parts
+              insert(node.setdefault("_dirs", {}).setdefault(head, {}), rest, full_id)
+
+          for p in raw:
+              if p == "README":
+                  continue
+              # Mintlify auto-redirects `/path/README` to `/path`, so
+              # register the directory form (page id without trailing
+              # /README). Files that don't end in /README keep their
+              # path verbatim.
+              if p.endswith("/README"):
+                  full_id = f"{PREFIX}/{p[: -len('/README')]}"
+                  parts = full_id[len(PREFIX) + 1:].split("/")
+              else:
+                  full_id = f"{PREFIX}/{p}"
+                  parts = p.split("/")
+              insert(tree, parts, full_id)
+
+          def to_mintlify(node, group_name):
+              pages = []
+              for fname, full_id in sorted(node.get("_files", [])):
+                  pages.append(full_id)
+              for dname, sub in sorted(node.get("_dirs", {}).items()):
+                  pages.append(to_mintlify(sub, dname))
+              return pages if group_name is None else {"group": group_name, "pages": pages}
+
+          new_pages = [f"{PREFIX}/README"] + to_mintlify(tree, None)
+
+          en = next(l for l in docs["navigation"]["languages"] if l["language"] == "en")
+          sdks_tab = next(t for t in en["tabs"] if t["tab"] == "SDKs")
+          gen_group = next(g for g in sdks_tab["groups"] if g["group"] == "Generated API Reference")
+          for sub in gen_group["pages"]:
+              if isinstance(sub, dict) and sub.get("group") == LANG_LABEL:
+                  sub["pages"] = new_pages
+                  break
+          else:
+              gen_group["pages"].append({"group": LANG_LABEL, "pages": new_pages})
+
+          docs_path.write_text(json.dumps(docs, indent=2, ensure_ascii=False))
+          print(f"Updated {LANG_LABEL} sub-group with {len(raw)} pages")
+          PYINNER
+
       - name: Open PR in docs repo
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
         with:
