@@ -1,0 +1,266 @@
+# Copyright 2026 ResQ Software
+# SPDX-License-Identifier: Apache-2.0
+#
+# Source-of-truth template lives in resq-software/docs:
+#   automation/source-repo-templates/api-docs.python.yml
+#
+# Copy this file to resq-software/pypi at:
+#   .github/workflows/api-docs.yml
+#
+# Renders Markdown API reference for every Python package in the
+# monorepo and opens a PR in resq-software/docs with generated
+# content under sdks/python/api/.
+#
+# Pipeline:
+#   1. uv pip install -e <each package> + lazydocs
+#   2. lazydocs <module>  ->  per-module Markdown files
+#   3. Mintlify-safety post-processing (./ prefix on bare links;
+#      MDX curly-brace escape outside code regions)
+#   4. peter-evans/create-pull-request opens a PR in the docs repo
+
+name: api-docs
+
+on:
+  push:
+    # pypi monorepo uses single-versioned bare semver tags (v1.3.4,
+    # v1.3.3, ...) covering both packages at once, so a single
+    # tag pattern is enough.
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Source ref to document (defaults to current ref)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Each run force-pushes the same auto/python-api-<ref> branch in
+  # the docs repo. Cancel any earlier run still in flight so we do
+  # not race on that push.
+  group: api-docs-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      PYTHON_VERSION: '3.13'
+      OUTPUT_DIR: generated-docs
+      DOCS_TARGET: sdks/python/api
+      # Public packages to document. Format: <pyproject-dir>:<import-name>.
+      # The pyproject directory is the path under packages/; the
+      # import name is what gets passed to `lazydocs` (typically the
+      # underscore form of the distribution name).
+      PUBLIC_PACKAGES: >-
+        resq-mcp:resq_mcp
+        resq-dsa:resq_dsa
+
+    steps:
+      - name: Resolve ref metadata
+        # Single source of truth for the ref this run documents.
+        # workflow_dispatch can pass an alternate ref via inputs.ref;
+        # fall back to github.ref_name (already stripped of refs/...).
+        # DOCS_REF_SLUG is branch-safe for use in PR/branch names.
+        run: |
+          raw='${{ inputs.ref || github.ref_name }}'
+          raw="${raw#refs/tags/}"
+          raw="${raw#refs/heads/}"
+          slug="${raw//\//-}"
+          echo "DOCS_REF_NAME=$raw" >> "$GITHUB_ENV"
+          echo "DOCS_REF_SLUG=$slug" >> "$GITHUB_ENV"
+
+      - name: Checkout source repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c7f87aa956e4c323abf06d5dec078e358f6b4d04 # v6.0.0
+
+      - name: Install packages + lazydocs into a venv
+        # lazydocs imports the packages it documents, so they must
+        # be installed in the active Python environment. uv pip
+        # install -e per package; the editable install resolves all
+        # transitive runtime deps the same way `pip install` would.
+        run: |
+          set -euo pipefail
+          uv venv .venv --python "$PYTHON_VERSION"
+          # shellcheck disable=SC1091
+          source .venv/bin/activate
+          for entry in $PUBLIC_PACKAGES; do
+            pkg_dir="${entry%%:*}"
+            uv pip install -e "packages/$pkg_dir"
+          done
+          uv pip install lazydocs
+
+      - name: Generate per-package Markdown
+        # lazydocs walks the import graph of each module and emits
+        # one .md per public submodule + an overview.md index.
+        # --src-base-url points at the source on GitHub for the ref
+        # we are documenting, so "View source" links resolve.
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source .venv/bin/activate
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+          missing=0
+          generated=0
+          for entry in $PUBLIC_PACKAGES; do
+            pkg_dir="${entry%%:*}"
+            mod_name="${entry##*:}"
+            out="$OUTPUT_DIR/$pkg_dir"
+            mkdir -p "$out"
+            # Confirm the module is importable before invoking
+            # lazydocs so the failure mode is clear.
+            if ! python -c "import ${mod_name}" 2>/dev/null; then
+              echo "::error ::cannot import ${mod_name} (entry ${entry})"
+              missing=1
+              continue
+            fi
+            lazydocs \
+              --output-path "$out" \
+              --src-base-url "https://github.com/${{ github.repository }}/blob/${DOCS_REF_NAME}/" \
+              --no-watermark \
+              --validate \
+              "$mod_name"
+            generated=$((generated + 1))
+          done
+          if [ "$missing" -ne 0 ] || [ "$generated" -eq 0 ]; then
+            echo "::error ::aborting to avoid syncing partial/empty docs output"
+            exit 1
+          fi
+
+      - name: Write top-level index
+        # lazydocs emits an overview.md per package. Stitch a small
+        # README.md at the top of the api/ folder linking to each
+        # so a single nav entry can drive into all packages.
+        run: |
+          {
+            echo "# ResQ Python SDK"
+            echo ""
+            echo "Auto-generated reference for the public packages in"
+            echo "[${{ github.repository }}](https://github.com/${{ github.repository }})."
+            echo ""
+            echo "## Packages"
+            echo ""
+            for entry in $PUBLIC_PACKAGES; do
+              pkg_dir="${entry%%:*}"
+              if [ -d "$OUTPUT_DIR/$pkg_dir" ]; then
+                echo "- [$pkg_dir]($pkg_dir/overview)"
+              fi
+            done
+          } > "$OUTPUT_DIR/README.md"
+
+      - name: Prefix bare-filename intra-page links with ./
+        # Mintlify rejects bare-filename .md links as broken;
+        # prefixing with ./ makes the resolver treat them as
+        # relative paths. Same pattern as the TypeScript template.
+        working-directory: ${{ env.OUTPUT_DIR }}
+        run: |
+          find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
+            sed -E -i \
+              's|\]\(([A-Za-z0-9][^)/]*\.md(#[^)]*)?)\)|](./\1)|g' \
+              "$f"
+          done
+
+      - name: Escape curly braces outside code regions (MDX safety)
+        # Mintlify parses .md as MDX. Any literal `{ ... }` in prose
+        # is interpreted as a JSX expression and trips the
+        # broken-links check. Awk tracks both triple-backtick fences
+        # and single-backtick inline spans, and rewrites curly
+        # braces to HTML entities only on prose outside any code
+        # region.
+        working-directory: ${{ env.OUTPUT_DIR }}
+        run: |
+          find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
+            awk '
+              BEGIN { in_fence = 0 }
+              /^```/ { in_fence = !in_fence; print; next }
+              {
+                if (in_fence) { print; next }
+                out = ""
+                in_inline_code = 0
+                n = length($0)
+                for (i = 1; i <= n; i++) {
+                  c = substr($0, i, 1)
+                  if (c == "`") {
+                    in_inline_code = !in_inline_code
+                    out = out c
+                  } else if (!in_inline_code && c == "{") {
+                    out = out "&#123;"
+                  } else if (!in_inline_code && c == "}") {
+                    out = out "&#125;"
+                  } else {
+                    out = out c
+                  }
+                }
+                print out
+              }
+            ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+          done
+
+      - name: Build pages index
+        # Flat JSON array of generated Markdown paths (without
+        # extension) so the docs repo can later splice them into
+        # docs.json automatically.
+        working-directory: ${{ env.OUTPUT_DIR }}
+        run: |
+          find . -name '*.md' -type f \
+            | sed 's|^\./||; s|\.md$||' \
+            | sort > _pages.txt
+          jq -R -s 'split("\n") | map(select(length > 0))' _pages.txt > _pages.json
+          rm _pages.txt
+
+      - name: Checkout docs repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: resq-software/docs
+          path: docs-checkout
+          token: ${{ secrets.DOCS_REPO_PR_TOKEN }}
+          persist-credentials: false
+
+      - name: Sync generated Markdown into docs checkout
+        run: |
+          target="docs-checkout/${DOCS_TARGET}"
+          mkdir -p "$target"
+          rm -rf "${target:?}"/*
+          cp -R "${OUTPUT_DIR}/." "$target/"
+
+      - name: Open PR in docs repo
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          path: docs-checkout
+          token: ${{ secrets.DOCS_REPO_PR_TOKEN }}
+          author: 'resq-sw <engineer@resq.software>'
+          committer: 'resq-sw <engineer@resq.software>'
+          commit-message: |
+            docs(python): sync API reference for ${{ env.DOCS_REF_NAME }}
+          title: 'docs(python): API reference ${{ env.DOCS_REF_NAME }}'
+          body: |
+            Auto-generated by `${{ github.workflow }}` in
+            `${{ github.repository }}` for ref `${{ env.DOCS_REF_NAME }}`
+            (run: ${{ github.run_id }}).
+
+            Regenerated files under `sdks/python/api/`. Review the
+            diff for unintended exports and merge to publish.
+          branch: auto/python-api-${{ env.DOCS_REF_SLUG }}
+          base: main
+          delete-branch: true
+          add-paths: sdks/python/api/**
+          labels: |
+            automated
+            docs:api-ref
+            language:python
