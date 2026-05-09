@@ -112,13 +112,14 @@ jobs:
           uv pip install "pydoc-markdown>=4"
 
       - name: Generate per-package Markdown
-        # pydoc-markdown produces a single combined Markdown stream
-        # per invocation. We render one file per top-level package
-        # at <pkg_dir>/overview.md so the docs site has a stable
-        # entry point that does not change as submodules are added
-        # or removed. The MarkdownRenderer with `render_module_header`
-        # and `descriptive_class_title` produces a layout similar to
-        # what lazydocs offered before its Python 3.13 incompat.
+        # `pydoc-markdown -p <pkg>` only documents the top-level
+        # module — it does NOT recurse into submodules, which left
+        # both overview.md files containing nothing but
+        # `# Table of Contents`. Walk the import graph ourselves
+        # via pkgutil and pass every submodule explicitly via an
+        # inline YAML config; this also lets us bump the renderer
+        # to enable module headers / class signatures so the output
+        # matches what lazydocs used to produce.
         run: |
           set -euo pipefail
           # shellcheck disable=SC1091
@@ -132,21 +133,56 @@ jobs:
             mod_name="${entry##*:}"
             out="$OUTPUT_DIR/$pkg_dir"
             mkdir -p "$out"
-            # Confirm the module is importable before invoking the
-            # renderer so the failure mode is clear.
             if ! python -c "import ${mod_name}" 2>/dev/null; then
               echo "::error ::cannot import ${mod_name} (entry ${entry})"
               missing=1
               continue
             fi
-            # `pydoc-markdown -p <pkg>` walks the package's import
-            # graph and emits one combined Markdown document to
-            # stdout. We capture it as overview.md per package.
-            pydoc-markdown -p "$mod_name" --render-toc > "$out/overview.md"
-            # Sanity check: empty output means the package has no
-            # docstrings or pydoc-markdown choked silently.
-            if [ ! -s "$out/overview.md" ]; then
-              echo "::error ::pydoc-markdown produced empty output for ${mod_name}"
+            # Discover submodules via Python's import system, then
+            # build a YAML config that names every one explicitly.
+            # The python loader's `modules:` form imports each name
+            # rather than scanning the filesystem, so editable
+            # installs work correctly.
+            modules=$(python - "$mod_name" <<'PY'
+          import importlib, pkgutil, sys
+          name = sys.argv[1]
+          mod = importlib.import_module(name)
+          out = [name]
+          if hasattr(mod, "__path__"):
+              for info in pkgutil.walk_packages(mod.__path__, name + "."):
+                  if "._" in info.name:
+                      continue
+                  out.append(info.name)
+          print("\n".join(out))
+          PY
+          )
+            cfg=$(mktemp --suffix=.yml)
+            {
+              echo "loaders:"
+              echo "  - type: python"
+              echo "    modules:"
+              echo "$modules" | while IFS= read -r m; do
+                [ -n "$m" ] && echo "      - ${m}"
+              done
+              echo "processors:"
+              echo "  - type: filter"
+              echo "    expression: not name.startswith('_') or name == '__init__'"
+              echo "  - type: smart"
+              echo "  - type: crossref"
+              echo "renderer:"
+              echo "  type: markdown"
+              echo "  render_toc: true"
+              echo "  render_module_header: true"
+              echo "  descriptive_class_title: true"
+              echo "  add_method_class_prefix: true"
+            } > "$cfg"
+            pydoc-markdown "$cfg" > "$out/overview.md"
+            rm -f "$cfg"
+            # Empty / TOC-only output means the renderer found no
+            # documentable members. Fail fast rather than syncing.
+            lines=$(wc -l < "$out/overview.md")
+            if [ "$lines" -lt 5 ]; then
+              echo "::error ::pydoc-markdown produced near-empty output for ${mod_name} (${lines} lines)"
               missing=1
               continue
             fi
@@ -161,6 +197,9 @@ jobs:
         # pydoc-markdown emits an overview.md per package. Stitch a
         # small README.md at the top of the api/ folder linking to
         # each so a single nav entry can drive into all packages.
+        # Package list is sorted alphabetically by directory name so
+        # it stays in sync with `_pages.json` (which `find ... | sort`
+        # produces below) regardless of PUBLIC_PACKAGES env order.
         run: |
           {
             echo "# ResQ Python SDK"
@@ -171,7 +210,8 @@ jobs:
             echo "## Packages"
             echo ""
             for entry in $PUBLIC_PACKAGES; do
-              pkg_dir="${entry%%:*}"
+              echo "${entry%%:*}"
+            done | sort | while read -r pkg_dir; do
               if [ -d "$OUTPUT_DIR/$pkg_dir" ]; then
                 echo "- [\`$pkg_dir\`]($pkg_dir/overview)"
               fi
