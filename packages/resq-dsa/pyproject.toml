@@ -45,6 +45,23 @@ select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM", "RUF"]
 strict = true
 python_version = "3.11"
 
+[tool.interrogate]
+# Current coverage is 100% under the exclusions below (the 2
+# missing in trie.py are private helpers ignored by ignore-private).
+# Threshold set at 90% to leave headroom for refactors that
+# temporarily expose a new symbol before its docstring lands.
+fail-under = 90
+ignore-init-module = true
+ignore-init-method = true
+ignore-magic = true
+ignore-private = true
+ignore-property-decorators = true
+ignore-nested-functions = true
+exclude = ["tests", "build", "dist"]
+verbose = 1
+quiet = false
+color = true
+
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"

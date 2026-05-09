@@ -56,6 +56,32 @@ jobs:
       - run: uv run mypy src/
         working-directory: ${{ matrix.dir }}
 
+  docstrings:
+    # Public API surface in src/ must carry docstrings. interrogate
+    # threshold is configured per-package in [tool.interrogate]
+    # in each pyproject.toml; raise the floor over time as gaps
+    # are filled.
+    name: Docstring Coverage (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: resq-mcp
+            dir: packages/resq-mcp
+          - name: resq-dsa
+            dir: packages/resq-dsa
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uvx interrogate --config pyproject.toml src/
+        working-directory: ${{ matrix.dir }}
+
   test:
     name: Test (${{ matrix.name }} / ${{ matrix.python-version }})
     needs: [lint, typecheck]
