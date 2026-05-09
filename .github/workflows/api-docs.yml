@@ -309,11 +309,13 @@ jobs:
           rm _pages.txt
 
       - name: Rename .md -> .mdx (Mintlify nav requires .mdx)
-        # Mintlify's docs.json nav resolver only matches .mdx.
-        # Leaving the tree as .md makes `mint dev` warn that
-        # nav-registered files do not exist. Rename every .md and
-        # rewrite the matching `(path.md)` / `(path.md#anchor)`
-        # link targets in place.
+        # Mintlify's docs.json nav resolver only matches .mdx, so
+        # leaving the tree as .md makes `mint dev` warn that
+        # nav-registered files do not exist. Rename every .md to
+        # .mdx and strip `.md` from in-content link targets so
+        # they remain extensionless (Mintlify resolves these to
+        # the matching .mdx file; an explicit `.mdx` extension in
+        # a link is rejected as a static-asset reference).
         working-directory: ${{ env.OUTPUT_DIR }}
         run: |
           set -euo pipefail
@@ -322,10 +324,10 @@ jobs:
           done
           python3 - <<'PY'
           import pathlib, re
-          LINK = re.compile(r'(\]\()((?!https?://|mailto:|#|/)[^)\s]*?)(\.md)((?:#[^)]*)?)(\))')
+          LINK = re.compile(r'(\]\()((?!https?://|mailto:|#|/)[^)\s]*?)(\.md)((?:#[^)]*)?(\)))')
           for p in pathlib.Path(".").rglob("*.mdx"):
               text = p.read_text(encoding="utf-8")
-              new = LINK.sub(r'\1\2.mdx\4\5', text)
+              new = LINK.sub(r'\1\2\4', text)
               if new != text:
                   p.write_text(new, encoding="utf-8")
           PY
