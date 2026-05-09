@@ -226,7 +226,7 @@ jobs:
       - name: Write top-level index
         # pydoc-markdown emits an overview.md per package. Stitch
         # a small README.mdx at the top of the api/ folder listing
-        # the available packages.
+        # the available packages with their pinned versions.
         #
         # Emit .mdx (not .md) because Mintlify's docs.json nav
         # resolver only matches .mdx for page ids; without this,
@@ -242,24 +242,49 @@ jobs:
         #
         # Package list is sorted alphabetically by directory name
         # so it stays in sync with `_pages.json` (which
-        # `find ... | sort` produces below).
+        # `find ... | sort` produces below). The version next to
+        # each package is read from its pyproject.toml so the
+        # rendered docs can be cross-referenced against a specific
+        # PyPI release; the workflow ref (`DOCS_REF_NAME`) is shown
+        # at the top so tag-triggered runs are clearly identified.
         run: |
-          {
-            echo "# ResQ Python SDK"
-            echo ""
-            echo "You can use this auto-generated reference for the public packages in"
-            echo "[\`${{ github.repository }}\`](https://github.com/${{ github.repository }})."
-            echo ""
-            echo "## Packages"
-            echo ""
-            for entry in $PUBLIC_PACKAGES; do
-              echo "${entry%%:*}"
-            done | sort | while read -r pkg_dir; do
-              if [ -d "$OUTPUT_DIR/$pkg_dir" ]; then
-                echo "- \`$pkg_dir\`"
-              fi
-            done
-          } > "$OUTPUT_DIR/README.mdx"
+          python3 - <<'PY' > "$OUTPUT_DIR/README.mdx"
+          import os
+          import pathlib
+          import re
+
+          ref_name = os.environ.get("DOCS_REF_NAME", "main")
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          output_dir = pathlib.Path(os.environ["OUTPUT_DIR"])
+          public = (os.environ.get("PUBLIC_PACKAGES") or "").split()
+
+          def read_version(pkg_dir: str) -> str:
+              # Best-effort version lookup so a parse failure doesn't
+              # break the whole doc build — fall back to "unknown".
+              pyproject = pathlib.Path("packages") / pkg_dir / "pyproject.toml"
+              if not pyproject.exists():
+                  return "unknown"
+              text = pyproject.read_text(encoding="utf-8")
+              m = re.search(r'^\s*version\s*=\s*"([^"]+)"', text, re.M)
+              return m.group(1) if m else "unknown"
+
+          print("# ResQ Python SDK")
+          print()
+          print(
+              f"Auto-generated API reference for "
+              f"[`{repo}`](https://github.com/{repo}) "
+              f"at ref `{ref_name}`."
+          )
+          print()
+          print("## Packages")
+          print()
+          entries = sorted(e.split(":", 1)[0] for e in public)
+          for pkg_dir in entries:
+              if not (output_dir / pkg_dir).is_dir():
+                  continue
+              version = read_version(pkg_dir)
+              print(f"- `{pkg_dir}` — `v{version}`")
+          PY
 
       - name: Prefix bare-filename intra-page links with ./
         # Mintlify rejects bare-filename .md links as broken;
