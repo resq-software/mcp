@@ -475,7 +475,9 @@ jobs:
           branch: auto/python-api-${{ env.DOCS_REF_SLUG }}
           base: main
           delete-branch: true
-          add-paths: sdks/python/api/**
+          add-paths: |
+            sdks/python/api/**
+            docs.json
           labels: |
             automated
             docs:api-ref
