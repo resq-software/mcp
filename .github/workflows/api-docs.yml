@@ -195,11 +195,17 @@ jobs:
 
       - name: Write top-level index
         # pydoc-markdown emits an overview.md per package. Stitch a
-        # small README.md at the top of the api/ folder linking to
+        # small README.mdx at the top of the api/ folder linking to
         # each so a single nav entry can drive into all packages.
         # Package list is sorted alphabetically by directory name so
         # it stays in sync with `_pages.json` (which `find ... | sort`
         # produces below) regardless of PUBLIC_PACKAGES env order.
+        # Emit .mdx (not .md) because Mintlify's docs.json nav
+        # resolver only matches .mdx for page ids; without this,
+        # mint dev warns "is referenced in the docs.json navigation
+        # but the file does not exist". Submodule pages stay .md
+        # since they are linked from content (where both extensions
+        # resolve) rather than from nav.
         run: |
           {
             echo "# ResQ Python SDK"
@@ -216,7 +222,7 @@ jobs:
                 echo "- [\`$pkg_dir\`]($pkg_dir/overview)"
               fi
             done
-          } > "$OUTPUT_DIR/README.md"
+          } > "$OUTPUT_DIR/README.mdx"
 
       - name: Prefix bare-filename intra-page links with ./
         # Mintlify rejects bare-filename .md links as broken;
@@ -298,8 +304,7 @@ jobs:
       - name: Build pages index
         # Flat JSON array of generated Markdown paths (without
         # extension) so the docs repo can later splice them into
-        # docs.json automatically. Built BEFORE the .md -> .mdx
-        # rename below so paths stay extensionless either way.
+        # docs.json automatically.
         working-directory: ${{ env.OUTPUT_DIR }}
         run: |
           find . -name '*.md' -type f \
@@ -307,30 +312,6 @@ jobs:
             | sort > _pages.txt
           jq -R -s 'split("\n") | map(select(length > 0))' _pages.txt > _pages.json
           rm _pages.txt
-
-      - name: Rename .md -> .mdx (Mintlify nav requires .mdx)
-        # Mintlify's docs.json nav resolver only matches .mdx, so
-        # leaving the tree as .md makes `mint dev` warn that
-        # nav-registered files do not exist. Rename every .md to
-        # .mdx and strip `.md` from in-content link targets so
-        # they remain extensionless (Mintlify resolves these to
-        # the matching .mdx file; an explicit `.mdx` extension in
-        # a link is rejected as a static-asset reference).
-        working-directory: ${{ env.OUTPUT_DIR }}
-        run: |
-          set -euo pipefail
-          find . -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
-            mv "$f" "${f%.md}.mdx"
-          done
-          python3 - <<'PY'
-          import pathlib, re
-          LINK = re.compile(r'(\]\()((?!https?://|mailto:|#|/)[^)\s]*?)(\.md)((?:#[^)]*)?(\)))')
-          for p in pathlib.Path(".").rglob("*.mdx"):
-              text = p.read_text(encoding="utf-8")
-              new = LINK.sub(r'\1\2\4', text)
-              if new != text:
-                  p.write_text(new, encoding="utf-8")
-          PY
 
       - name: Checkout docs repo
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
