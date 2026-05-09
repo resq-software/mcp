@@ -489,7 +489,7 @@ jobs:
         # Mintlify only routes pages registered in docs.json. The
         # _pages.json artifact lists every generated Markdown path;
         # rewrite the matching language sub-group under the
-        # 'Generated API Reference' group so all pages are
+        # 'Generated Package References' group so all pages are
         # discoverable, in-content cross-links resolve, and direct
         # URLs work.
         working-directory: docs-checkout
@@ -547,7 +547,7 @@ jobs:
 
           en = next(l for l in docs["navigation"]["languages"] if l["language"] == "en")
           sdks_tab = next(t for t in en["tabs"] if t["tab"] == "SDKs")
-          gen_group = next(g for g in sdks_tab["groups"] if g["group"] == "Generated API Reference")
+          gen_group = next(g for g in sdks_tab["groups"] if g["group"] == "Generated Package References")
           for sub in gen_group["pages"]:
               if isinstance(sub, dict) and sub.get("group") == LANG_LABEL:
                   sub["pages"] = new_pages
