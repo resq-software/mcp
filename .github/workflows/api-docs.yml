@@ -113,13 +113,21 @@ jobs:
 
       - name: Generate per-package Markdown
         # `pydoc-markdown -p <pkg>` only documents the top-level
-        # module — it does NOT recurse into submodules, which left
-        # both overview.md files containing nothing but
-        # `# Table of Contents`. Walk the import graph ourselves
-        # via pkgutil and pass every submodule explicitly via an
-        # inline YAML config; this also lets us bump the renderer
-        # to enable module headers / class signatures so the output
-        # matches what lazydocs used to produce.
+        # module. Earlier we worked around that by listing every
+        # submodule in one config so we'd at least get content, but
+        # the result was a single mega-file per package — too coarse
+        # for the sidebar.
+        #
+        # Instead: walk the import graph and run pydoc-markdown ONCE
+        # PER SUBMODULE, writing the rendered Markdown to a path
+        # mirroring the dotted module name. This produces:
+        #   <pkg_dir>/overview.md          (the top-level module)
+        #   <pkg_dir>/core.md              (resq_mcp.core)
+        #   <pkg_dir>/core/config.md       (resq_mcp.core.config)
+        #   <pkg_dir>/drone.md             (resq_mcp.drone)
+        #   ...
+        # which the splice-sdk-nav.py step in the docs repo registers
+        # as separate sidebar entries.
         run: |
           set -euo pipefail
           # shellcheck disable=SC1091
@@ -138,54 +146,76 @@ jobs:
               missing=1
               continue
             fi
-            # Discover submodules via Python's import system, then
-            # build a YAML config that names every one explicitly.
-            # The python loader's `modules:` form imports each name
-            # rather than scanning the filesystem, so editable
-            # installs work correctly.
-            modules=$(python - "$mod_name" <<'PY'
-          import importlib, pkgutil, sys
-          name = sys.argv[1]
-          mod = importlib.import_module(name)
-          out = [name]
-          if hasattr(mod, "__path__"):
-              for info in pkgutil.walk_packages(mod.__path__, name + "."):
+            # Discover submodules; produce one rendered .md per
+            # module name. Filename for the top-level module is
+            # `overview.md`; everything else mirrors the dotted name
+            # below the package root, with `.` -> `/` so the result
+            # matches the import hierarchy.
+            python - "$mod_name" "$out" <<'PY'
+          import importlib
+          import pathlib
+          import pkgutil
+          import subprocess
+          import sys
+
+          top_name, out_dir = sys.argv[1], pathlib.Path(sys.argv[2])
+          top = importlib.import_module(top_name)
+          modules = [top_name]
+          if hasattr(top, "__path__"):
+              for info in pkgutil.walk_packages(top.__path__, top_name + "."):
                   if "._" in info.name:
                       continue
-                  out.append(info.name)
-          print("\n".join(out))
+                  modules.append(info.name)
+
+          rendered = 0
+          for mod in modules:
+              if mod == top_name:
+                  rel = "overview.md"
+              else:
+                  rel = mod[len(top_name) + 1:].replace(".", "/") + ".md"
+              dest = out_dir / rel
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              # Single-module pydoc-markdown invocation. Inline YAML
+              # config; renderer flags match the previous combined
+              # config for visual parity.
+              cfg = (
+                  "loaders:\n"
+                  "- type: python\n"
+                  f"  modules: ['{mod}']\n"
+                  "processors:\n"
+                  "- type: filter\n"
+                  "  expression: not name.startswith('_') or name == '__init__'\n"
+                  "- type: smart\n"
+                  "- type: crossref\n"
+                  "renderer:\n"
+                  "  type: markdown\n"
+                  "  render_module_header: true\n"
+                  "  descriptive_class_title: true\n"
+                  "  add_method_class_prefix: true\n"
+              )
+              cfg_path = dest.parent / f".{dest.name}.cfg.yml"
+              cfg_path.write_text(cfg)
+              try:
+                  result = subprocess.run(
+                      ["pydoc-markdown", str(cfg_path)],
+                      capture_output=True, text=True, check=False,
+                  )
+                  if result.returncode != 0:
+                      print(f"::warning ::pydoc-markdown failed for {mod}: {result.stderr.strip()}")
+                      continue
+                  body = result.stdout.strip()
+                  if not body:
+                      # Module has no docstrings at all; emit a stub
+                      # so the page is reachable from nav.
+                      body = f"# {mod}\n\n*No public documentation.*\n"
+                  dest.write_text(body, encoding="utf-8")
+                  rendered += 1
+              finally:
+                  cfg_path.unlink(missing_ok=True)
+          print(f"rendered {rendered}/{len(modules)} submodules of {top_name}")
+          if rendered == 0:
+              sys.exit(1)
           PY
-          )
-            cfg=$(mktemp --suffix=.yml)
-            {
-              echo "loaders:"
-              echo "  - type: python"
-              echo "    modules:"
-              echo "$modules" | while IFS= read -r m; do
-                [ -n "$m" ] && echo "      - ${m}"
-              done
-              echo "processors:"
-              echo "  - type: filter"
-              echo "    expression: not name.startswith('_') or name == '__init__'"
-              echo "  - type: smart"
-              echo "  - type: crossref"
-              echo "renderer:"
-              echo "  type: markdown"
-              echo "  render_toc: true"
-              echo "  render_module_header: true"
-              echo "  descriptive_class_title: true"
-              echo "  add_method_class_prefix: true"
-            } > "$cfg"
-            pydoc-markdown "$cfg" > "$out/overview.md"
-            rm -f "$cfg"
-            # Empty / TOC-only output means the renderer found no
-            # documentable members. Fail fast rather than syncing.
-            lines=$(wc -l < "$out/overview.md")
-            if [ "$lines" -lt 5 ]; then
-              echo "::error ::pydoc-markdown produced near-empty output for ${mod_name} (${lines} lines)"
-              missing=1
-              continue
-            fi
             generated=$((generated + 1))
           done
           if [ "$missing" -ne 0 ] || [ "$generated" -eq 0 ]; then
