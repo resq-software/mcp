@@ -194,12 +194,25 @@ jobs:
           fi
 
       - name: Write top-level index
-        # pydoc-markdown emits an overview.md per package. Stitch a
-        # small README.md at the top of the api/ folder linking to
-        # each so a single nav entry can drive into all packages.
-        # Package list is sorted alphabetically by directory name so
-        # it stays in sync with `_pages.json` (which `find ... | sort`
-        # produces below) regardless of PUBLIC_PACKAGES env order.
+        # pydoc-markdown emits an overview.md per package. Stitch
+        # a small README.mdx at the top of the api/ folder listing
+        # the available packages.
+        #
+        # Emit .mdx (not .md) because Mintlify's docs.json nav
+        # resolver only matches .mdx for page ids; without this,
+        # mint dev returns 404 on the registered page.
+        #
+        # Package names are emitted as plain backticked text rather
+        # than hyperlinks because cross-page links from a .mdx
+        # parent require nav registration in Mintlify (the bare
+        # filename / extensionless-page link form that works in
+        # .md parents fails broken-links validation when the parent
+        # is .mdx). Users navigate to per-package pages via the
+        # URL bar or future programmatic _pages.json nav splice.
+        #
+        # Package list is sorted alphabetically by directory name
+        # so it stays in sync with `_pages.json` (which
+        # `find ... | sort` produces below).
         run: |
           {
             echo "# ResQ Python SDK"
@@ -213,10 +226,10 @@ jobs:
               echo "${entry%%:*}"
             done | sort | while read -r pkg_dir; do
               if [ -d "$OUTPUT_DIR/$pkg_dir" ]; then
-                echo "- [\`$pkg_dir\`]($pkg_dir/overview)"
+                echo "- \`$pkg_dir\`"
               fi
             done
-          } > "$OUTPUT_DIR/README.md"
+          } > "$OUTPUT_DIR/README.mdx"
 
       - name: Prefix bare-filename intra-page links with ./
         # Mintlify rejects bare-filename .md links as broken;
