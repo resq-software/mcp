@@ -230,10 +230,12 @@ jobs:
               "$f"
           done
 
-      - name: Escape curly braces outside code regions (MDX safety)
-        # Mintlify parses .md as MDX. Any literal `{ ... }` in prose
-        # is interpreted as a JSX expression and trips the
-        # broken-links check.
+      - name: Escape MDX-special characters outside code regions
+        # Mintlify parses .md as MDX. Literal `{ ... }` in prose is
+        # interpreted as a JSX expression and trips the broken-links
+        # check; literal `<` followed by `=`, digits, or whitespace
+        # makes the parser look for a tag name and bail with
+        # `Unexpected character ... before name`.
         #
         # CommonMark inline code: a span opens with N consecutive
         # backticks and closes with the same number. The earlier
@@ -286,6 +288,20 @@ jobs:
                     out = out "&#123;"; i++
                   } else if (c == "}") {
                     out = out "&#125;"; i++
+                  } else if (c == "<") {
+                    # MDX treats `<` as the start of a JSX tag.
+                    # Pydoc-markdown sometimes emits inequalities
+                    # like `confidence <= 0.85` directly in prose,
+                    # which the parser rejects with
+                    #   Unexpected character `=` ... before name.
+                    # Escape any `<` not immediately followed by a
+                    # tag-name character (letter, `!`, `/`).
+                    next_c = (i + 1 <= n) ? substr(s, i + 1, 1) : ""
+                    if (next_c ~ /[A-Za-z!\/]/) {
+                      out = out c; i++
+                    } else {
+                      out = out "&lt;"; i++
+                    }
                   } else {
                     out = out c; i++
                   }
