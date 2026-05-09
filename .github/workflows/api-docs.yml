@@ -354,6 +354,110 @@ jobs:
             ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
           done
 
+      - name: Cross-link package overview re-export stubs
+        # pydoc-markdown emits an empty `## ClassName` heading on each
+        # `<package>/overview.md` for every name re-exported from the
+        # package's `__init__.py`. The actual class/function bodies
+        # live on submodule pages (e.g. `models.md`, `tools.md`), so
+        # the overview's right-side TOC entries lead to dead-end
+        # in-page anchors with no content.
+        #
+        # Replace the empty stub block with a clean `## API` section
+        # listing each symbol as a link to where it's actually
+        # defined. Mapping is built by scanning every non-overview
+        # page for canonical definitions:
+        #   `## ClassName Objects` (h2 + " Objects" suffix)  -> class
+        #   `#### function_name` (h4)                        -> function
+        # Other heading shapes (h2 without "Objects", h3) are skipped
+        # because pydoc-markdown reuses them for re-export stubs and
+        # for class-internal sections respectively.
+        working-directory: ${{ env.OUTPUT_DIR }}
+        run: |
+          python3 - <<'PYINNER'
+          import pathlib
+          import re
+
+          root = pathlib.Path(".")
+
+          def slugify(text: str) -> str:
+              s = text.lower().replace("\\_", "_").replace("\\", "")
+              s = re.sub(r"[^a-z0-9_\s-]", "", s)
+              s = re.sub(r"\s+", "-", s.strip())
+              return s
+
+          heading_re = re.compile(
+              r'<a id="([^"]+)"></a>\n+(#{2,6})\s+([^\n]+?)\n'
+          )
+
+          symbol_map: dict[tuple[str, str], tuple[str, str]] = {}
+          for md in root.rglob("*.md"):
+              if md.name in ("overview.md", "README.md"):
+                  continue
+              rel = md.relative_to(root).with_suffix("").as_posix()
+              text = md.read_text(encoding="utf-8")
+              for m in heading_re.finditer(text):
+                  full_id = m.group(1)
+                  level = len(m.group(2))
+                  heading = m.group(3).strip()
+                  parts = full_id.split(".")
+                  if len(parts) < 3:
+                      continue
+                  parent = parts[-2]
+                  # Class members (e.g. `Class.method`) sit under an
+                  # uppercase parent — those are not standalone
+                  # symbols and shouldn't be link targets here.
+                  if parent and parent[0].isupper():
+                      continue
+                  is_class_def = level == 2 and heading.endswith(" Objects")
+                  is_func_def = level == 4
+                  if not (is_class_def or is_func_def):
+                      continue
+                  key = (parts[0], parts[-1])
+                  symbol_map.setdefault(key, (rel, slugify(heading)))
+
+          # An empty stub is `<a id="pkg.Name"></a>\n\n## Name\n`
+          # followed by another anchor or end-of-file (no body
+          # in between).
+          stub_re = re.compile(
+              r'<a id="(?P<id>[^"]+)"></a>\n+##\s+(?P<heading>[^\n]+?)\n'
+              r'(?=\n<a id="|\s*\Z)'
+          )
+
+          rewritten = 0
+          for overview in root.rglob("overview.md"):
+              text = overview.read_text(encoding="utf-8")
+              stubs = list(stub_re.finditer(text))
+              if not stubs:
+                  continue
+              pre = text[: stubs[0].start()].rstrip() + "\n\n"
+              overview_dir = overview.parent.relative_to(root).as_posix()
+              api_lines: list[str] = []
+              for stub in stubs:
+                  full_id = stub.group("id")
+                  parts = full_id.split(".")
+                  if len(parts) != 2:
+                      continue
+                  package, name = parts
+                  target = symbol_map.get((package, name))
+                  if target:
+                      target_rel, slug = target
+                      if target_rel.startswith(overview_dir + "/"):
+                          target_rel = target_rel[len(overview_dir) + 1:]
+                      api_lines.append(
+                          f"- [`{name}`](./{target_rel}#{slug})"
+                      )
+                  else:
+                      # Symbol re-exported from `__init__.py` but not
+                      # documented anywhere (e.g. typing helpers).
+                      api_lines.append(f"- `{name}`")
+              if not api_lines:
+                  continue
+              new_text = pre + "## API\n\n" + "\n".join(api_lines) + "\n"
+              overview.write_text(new_text, encoding="utf-8")
+              rewritten += 1
+          print(f"  rewrote {rewritten} package overview pages")
+          PYINNER
+
       - name: Build pages index
         # Flat JSON array of generated Markdown paths (without
         # extension) so the docs repo can later splice them into
