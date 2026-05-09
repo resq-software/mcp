@@ -103,13 +103,22 @@ jobs:
             pkg_dir="${entry%%:*}"
             uv pip install -e "packages/$pkg_dir"
           done
-          uv pip install lazydocs
+          # pydoc-markdown rather than lazydocs: lazydocs uses
+          # pkgutil's deprecated find_module(), which Python 3.12
+          # removed. Every submodule walk fails with
+          #   AttributeError: 'FileFinder' object has no attribute 'find_module'
+          # on the runner's Python 3.13. pydoc-markdown is on the
+          # find_spec() API and produces Markdown directly.
+          uv pip install "pydoc-markdown>=4"
 
       - name: Generate per-package Markdown
-        # lazydocs walks the import graph of each module and emits
-        # one .md per public submodule + an overview.md index.
-        # --src-base-url points at the source on GitHub for the ref
-        # we are documenting, so "View source" links resolve.
+        # pydoc-markdown produces a single combined Markdown stream
+        # per invocation. We render one file per top-level package
+        # at <pkg_dir>/overview.md so the docs site has a stable
+        # entry point that does not change as submodules are added
+        # or removed. The MarkdownRenderer with `render_module_header`
+        # and `descriptive_class_title` produces a layout similar to
+        # what lazydocs offered before its Python 3.13 incompat.
         run: |
           set -euo pipefail
           # shellcheck disable=SC1091
@@ -123,26 +132,24 @@ jobs:
             mod_name="${entry##*:}"
             out="$OUTPUT_DIR/$pkg_dir"
             mkdir -p "$out"
-            # Confirm the module is importable before invoking
-            # lazydocs so the failure mode is clear.
+            # Confirm the module is importable before invoking the
+            # renderer so the failure mode is clear.
             if ! python -c "import ${mod_name}" 2>/dev/null; then
               echo "::error ::cannot import ${mod_name} (entry ${entry})"
               missing=1
               continue
             fi
-            # --src-base-url must point at the package root, not the
-            # repo root: lazydocs (run against an editable install)
-            # records source paths relative to the package's pyproject
-            # location, so prepending packages/<pkg_dir>/ produces
-            # correct GitHub source links. Without this prefix the
-            # "View source" anchors land on the repo root + a relative
-            # path that does not exist (404).
-            lazydocs \
-              --output-path "$out" \
-              --src-base-url "https://github.com/${{ github.repository }}/blob/${DOCS_REF_NAME}/packages/${pkg_dir}/" \
-              --no-watermark \
-              --validate \
-              "$mod_name"
+            # `pydoc-markdown -p <pkg>` walks the package's import
+            # graph and emits one combined Markdown document to
+            # stdout. We capture it as overview.md per package.
+            pydoc-markdown -p "$mod_name" --render-toc > "$out/overview.md"
+            # Sanity check: empty output means the package has no
+            # docstrings or pydoc-markdown choked silently.
+            if [ ! -s "$out/overview.md" ]; then
+              echo "::error ::pydoc-markdown produced empty output for ${mod_name}"
+              missing=1
+              continue
+            fi
             generated=$((generated + 1))
           done
           if [ "$missing" -ne 0 ] || [ "$generated" -eq 0 ]; then
@@ -151,22 +158,22 @@ jobs:
           fi
 
       - name: Write top-level index
-        # lazydocs emits an overview.md per package. Stitch a small
-        # README.md at the top of the api/ folder linking to each
-        # so a single nav entry can drive into all packages.
+        # pydoc-markdown emits an overview.md per package. Stitch a
+        # small README.md at the top of the api/ folder linking to
+        # each so a single nav entry can drive into all packages.
         run: |
           {
             echo "# ResQ Python SDK"
             echo ""
-            echo "Auto-generated reference for the public packages in"
-            echo "[${{ github.repository }}](https://github.com/${{ github.repository }})."
+            echo "You can use this auto-generated reference for the public packages in"
+            echo "[\`${{ github.repository }}\`](https://github.com/${{ github.repository }})."
             echo ""
             echo "## Packages"
             echo ""
             for entry in $PUBLIC_PACKAGES; do
               pkg_dir="${entry%%:*}"
               if [ -d "$OUTPUT_DIR/$pkg_dir" ]; then
-                echo "- [$pkg_dir]($pkg_dir/overview)"
+                echo "- [\`$pkg_dir\`]($pkg_dir/overview)"
               fi
             done
           } > "$OUTPUT_DIR/README.md"
