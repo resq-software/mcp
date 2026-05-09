@@ -123,6 +123,24 @@ exclude_lines = [
   "if __name__ == .__main__.:",
 ]
 
+[tool.interrogate]
+# Initial fail threshold set just below current measured coverage
+# (76.6%) so the gate locks in today's level and forces ratcheting up
+# as docstrings are added. Concentration of misses is in
+# core/telemetry.py (OpenTelemetry helpers); document those next and
+# raise this number.
+fail-under = 75
+ignore-init-module = true
+ignore-init-method = true
+ignore-magic = true
+ignore-private = true
+ignore-property-decorators = true
+ignore-nested-functions = true
+exclude = ["tests", "build", "dist"]
+verbose = 1
+quiet = false
+color = true
+
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
