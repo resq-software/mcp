@@ -125,10 +125,10 @@ exclude_lines = [
 
 [tool.interrogate]
 # Initial fail threshold set just below current measured coverage
-# (76.6%) so the gate locks in today's level and forces ratcheting up
-# as docstrings are added. Concentration of misses is in
-# core/telemetry.py (OpenTelemetry helpers); document those next and
-# raise this number.
+# under the exclusions below (81%) so the gate locks in today's level
+# and forces ratcheting up as docstrings are added. Concentration of
+# misses is in core/telemetry.py (OpenTelemetry helpers); document
+# those next and raise this number.
 fail-under = 75
 ignore-init-module = true
 ignore-init-method = true

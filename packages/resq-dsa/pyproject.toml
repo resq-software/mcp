@@ -46,8 +46,10 @@ strict = true
 python_version = "3.11"
 
 [tool.interrogate]
-# Current coverage is 95% (only 2 missing in trie.py). Threshold set
-# at 90% to lock in today's level with a small buffer for refactors.
+# Current coverage is 100% under the exclusions below (the 2
+# missing in trie.py are private helpers ignored by ignore-private).
+# Threshold set at 90% to leave headroom for refactors that
+# temporarily expose a new symbol before its docstring lands.
 fail-under = 90
 ignore-init-module = true
 ignore-init-method = true
