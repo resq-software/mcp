@@ -468,12 +468,20 @@ jobs:
                       target_rel, slug = target
                       if target_rel.startswith(overview_dir + "/"):
                           target_rel = target_rel[len(overview_dir) + 1:]
+                      # Plain `[name](url)` (no backticks) so Mintlify
+                      # applies its standard link styling. The earlier
+                      # `[`name`](url)` form wrapped the text in a
+                      # <code> element whose background made the link
+                      # visually indistinguishable from non-clickable
+                      # code spans elsewhere on the page.
                       api_lines.append(
-                          f"- [`{name}`](./{target_rel}#{slug})"
+                          f"- [{name}](./{target_rel}#{slug})"
                       )
                   else:
                       # Symbol re-exported from `__init__.py` but not
                       # documented anywhere (e.g. typing helpers).
+                      # Keep the code-style for unlinked entries so
+                      # the missing-target case is visually distinct.
                       api_lines.append(f"- `{name}`")
               if not api_lines:
                   continue
