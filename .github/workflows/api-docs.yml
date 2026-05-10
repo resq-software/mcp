@@ -67,8 +67,17 @@ jobs:
         # workflow_dispatch can pass an alternate ref via inputs.ref;
         # fall back to github.ref_name (already stripped of refs/...).
         # DOCS_REF_SLUG is branch-safe for use in PR/branch names.
+        #
+        # The ref is routed through env: instead of being inlined via
+        # ${{ }}. Inlining at template-expansion time would interpolate
+        # the raw string into the shell literal, so a tag name with a
+        # single quote (Git allows it) could break out of the quoted
+        # context. Env indirection keeps user-controlled data on the
+        # variable side of the shell parser, where it cannot escape.
+        env:
+          REF_RAW: ${{ inputs.ref || github.ref_name }}
         run: |
-          raw='${{ inputs.ref || github.ref_name }}'
+          raw="$REF_RAW"
           raw="${raw#refs/tags/}"
           raw="${raw#refs/heads/}"
           slug="${raw//\//-}"
