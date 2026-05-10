@@ -96,7 +96,16 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install uv
+        # Caching is disabled to close zizmor/cache-poisoning (alert
+        # #44). This workflow triggers on `push.tags: 'v*'`, so an
+        # actor able to push tags could populate the GitHub Actions
+        # cache; later runs across the org could then restore from a
+        # poisoned cache. setup-uv@v6 enables caching by default, and
+        # the docs generation runs only once per release tag — cache
+        # hits don't justify the exposure here.
         uses: astral-sh/setup-uv@c7f87aa956e4c323abf06d5dec078e358f6b4d04 # v6.0.0
+        with:
+          enable-cache: false
 
       - name: Install packages + lazydocs into a venv
         # lazydocs imports the packages it documents, so they must
