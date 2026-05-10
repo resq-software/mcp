@@ -1,0 +1,19 @@
+# Copyright 2026 ResQ Software
+# SPDX-License-Identifier: Apache-2.0
+#
+# zizmor configuration for resq-software/pypi.
+# https://docs.zizmor.sh/configuration/
+
+rules:
+  secrets-inherit:
+    ignore:
+      # The org-wide reusable workflow at
+      # resq-software/.github/.github/workflows/security-scan.yml does
+      # not declare a `workflow_call.secrets:` contract. With no
+      # contract, GitHub Actions rejects any caller that tries to pass
+      # named secrets explicitly — the run terminates as
+      # `startup_failure` before any job starts. `secrets: inherit` is
+      # the only valid option until the upstream workflow is updated to
+      # declare its secrets surface. Once that lands, drop this ignore
+      # and switch security.yml back to explicit `SEMGREP_APP_TOKEN`.
+      - security.yml

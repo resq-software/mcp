@@ -1,8 +1,30 @@
 name: Release
 
+# Manual-only trigger.
+#
+# `python-semantic-release` needs to push the version-bump commit and
+# tag back to `main`. The `default-branch-baseline` ruleset on this
+# repo requires every change to `main` to come through a pull request
+# (bypass mode is `pull_request`, so even bypass actors must use a PR).
+# Direct pushes from the Actions GITHUB_TOKEN — including the bot's
+# release commit — are rejected with `GH013: Repository rule
+# violations`. Keeping `push: branches: [main]` on this trigger
+# therefore caused every commit to fail the `Release` workflow.
+#
+# Options for restoring automatic releases on push:
+#   1. Add a dedicated GitHub App / `resq-sw` PAT to `bypass_actors` on
+#      ruleset 15191038 with `bypass_mode: always`, then wire its token
+#      into `mcp-release` / `dsa-release` checkouts and the
+#      `python-semantic-release` action.
+#   2. Restructure to a PR-based release flow: run semantic-release
+#      with `commit: false, push: false` to compute the version, then
+#      open a release PR via `peter-evans/create-pull-request` so the
+#      bump merges through the protected-branch policy normally.
+#
+# Until one of those lands, dispatch this workflow manually from the
+# Actions tab (or via `gh workflow run Release.yml`) when you want to
+# cut a release.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

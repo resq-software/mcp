@@ -26,5 +26,12 @@ jobs:
     with:
       languages: '["python","actions"]'
       enable-semgrep: true
-    secrets:
-      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+    # `secrets: inherit` is required here because the upstream reusable
+    # workflow does not declare a `workflow_call.secrets:` contract.
+    # Passing named secrets (e.g. `SEMGREP_APP_TOKEN: ${{ ... }}`) causes
+    # GitHub to reject the call with `startup_failure` before any job
+    # runs. Tracked: follow up on resq-software/.github to declare the
+    # secrets contract, after which this can become explicit.
+    # zizmor warning `secrets-inherit` (#43) is intentionally suppressed
+    # in `.github/zizmor.yml` for the same reason.
+    secrets: inherit
