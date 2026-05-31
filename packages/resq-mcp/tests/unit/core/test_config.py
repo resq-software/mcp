@@ -66,6 +66,25 @@ class TestSettings:
             settings = Settings()
             assert settings.SAFE_MODE is False
 
+    def test_transport_defaults_to_stdio(self) -> None:
+        """Transport defaults to stdio so client-spawned usage is unchanged."""
+        assert Settings().TRANSPORT == "stdio"
+
+    def test_transport_can_be_set_via_env(self) -> None:
+        """RESQ_TRANSPORT selects a network transport."""
+        with patch.dict(os.environ, {"RESQ_TRANSPORT": "http"}):
+            assert Settings().TRANSPORT == "http"
+
+    def test_invalid_transport_rejected(self) -> None:
+        """An unknown transport value fails validation fast."""
+        from pydantic import ValidationError
+
+        with (
+            patch.dict(os.environ, {"RESQ_TRANSPORT": "carrier-pigeon"}),
+            pytest.raises(ValidationError),
+        ):
+            Settings()
+
 
 class TestValidateEnvironment:
     """Tests for the validate_environment function."""
