@@ -22,8 +22,9 @@ Environment variables:
     RESQ_VERSION: Version string for the server
     RESQ_DEBUG: Enable debug logging (true/false)
     RESQ_API_KEY: API key for authenticated endpoints
-    RESQ_PORT: Port for SSE server
-    RESQ_HOST: Host to bind to
+    RESQ_TRANSPORT: MCP transport — stdio (default), http, sse, or streamable-http
+    RESQ_PORT: Port for HTTP/SSE server
+    RESQ_HOST: Host to bind to (HTTP/SSE transports)
     RESQ_SAFE_MODE: If True, side-effecting tools are disabled or mocked safely
 """
 
@@ -62,8 +63,15 @@ class Settings(BaseSettings):
     # TODO(wombocombo): API_KEY should be required in production - currently has dev fallback
 
     # Deployment
-    PORT: int = Field(default=8000, description="Port for SSE server")
-    HOST: str = Field(default="0.0.0.0", description="Host to bind to")
+    TRANSPORT: Literal["stdio", "http", "sse", "streamable-http"] = Field(
+        default="stdio",
+        description=(
+            "MCP transport. 'stdio' (default) is spawned by an MCP client; "
+            "'http'/'sse'/'streamable-http' bind a network listener on HOST:PORT."
+        ),
+    )
+    PORT: int = Field(default=8000, description="Port for HTTP/SSE server")
+    HOST: str = Field(default="0.0.0.0", description="Host to bind to (HTTP/SSE transports)")
 
     # Feature Flags
     SAFE_MODE: bool = Field(
