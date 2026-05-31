@@ -51,7 +51,7 @@ See Also:
     - README.md: Complete documentation
 """
 
-from .server import mcp
+from .server import main
 
 if __name__ == "__main__":
-    mcp.run()
+    main()

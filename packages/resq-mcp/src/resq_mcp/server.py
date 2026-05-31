@@ -255,9 +255,18 @@ import resq_mcp.resources  # noqa: F401, E402
 
 
 def main() -> None:
-    """Console script entry point for the ResQ MCP server."""
+    """Console script entry point for the ResQ MCP server.
+
+    Selects the transport from ``RESQ_TRANSPORT`` (default ``stdio``). For the
+    network transports (``http``/``sse``/``streamable-http``) the server binds to
+    ``RESQ_HOST``:``RESQ_PORT``; ``stdio`` does not accept host/port and is left
+    to FastMCP's default client-spawned behaviour.
+    """
     validate_environment()
-    mcp.run()
+    if settings.TRANSPORT == "stdio":
+        mcp.run()
+    else:
+        mcp.run(transport=settings.TRANSPORT, host=settings.HOST, port=settings.PORT)
 
 
 if __name__ == "__main__":
