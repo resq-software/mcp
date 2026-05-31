@@ -17,7 +17,11 @@ updates:
     labels: [chore, deps]
     open-pull-requests-limit: 5
   - package-ecosystem: pip
-    directory: /
+    # Manifests live in each package, not at the repo root (no root pyproject.toml).
+    # Pointing at "/" makes Dependabot's pip job fail every run.
+    directories:
+      - /packages/resq-mcp
+      - /packages/resq-dsa
     schedule:
       interval: weekly
       day: monday
