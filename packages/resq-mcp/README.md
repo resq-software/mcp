@@ -216,22 +216,45 @@ Control server behavior via environment variables or a `.env` file:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `RESQ_API_KEY` | Platform authentication token | `resq-dev-token` |
+| `RESQ_API_KEY` | Active bearer token (required, non-default, for network transports) | `resq-dev-token` |
+| `RESQ_API_KEY_PREVIOUS` | Prior token honored during a rotation grace window | `` (disabled) |
+| `RESQ_API_KEY_GRACE_SECONDS` | Seconds a rotated-out token stays valid | `3600` |
 | `RESQ_SAFE_MODE` | Prevents destructive mutations | `true` |
-| `RESQ_PORT` | Port for SSE (networked) mode | `8000` |
-| `RESQ_HOST` | Host to bind the SSE server | `0.0.0.0` |
+| `RESQ_TRANSPORT` | Transport: `stdio`, `http`, `sse`, `streamable-http` | `stdio` |
+| `RESQ_PORT` | Port for network transport (`http`/`sse`/`streamable-http`) | `8000` |
+| `RESQ_HOST` | Host to bind the network server | `0.0.0.0` |
+| `RESQ_AUDIT_ENABLED` | Emit hash-anchored audit records (`resq-mcp.audit`) | `true` |
+| `RESQ_RATE_LIMIT_ENABLED` | Enforce per-tool call-rate limits | `true` |
+| `RESQ_RATE_LIMIT_MAX_CALLS` | Max calls per tool per window | `60` |
+| `RESQ_RATE_LIMIT_WINDOW_SECONDS` | Rate-limit window width (seconds) | `60` |
 | `RESQ_DEBUG` | Enable verbose logging | `false` |
 | `RESQ_TELEMETRY_BACKEND` | Observability backend (`none`, `console`, `jaeger`, `otlp`) | `none` |
 | `RESQ_OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP exporter endpoint (when backend is `otlp`) | `http://localhost:4317` |
 | `RESQ_OTEL_SERVICE_NAME` | Service name reported to the telemetry backend | `resq-mcp` |
 
-> **Note**: `RESQ_API_KEY` defaults to `resq-dev-token` for local development. No external token is needed to run the server — it works out of the box.
+> **Note**: `RESQ_API_KEY` defaults to `resq-dev-token` for local `stdio` use — it works out of the box. **Network transports (`http`/`sse`/`streamable-http`) refuse to start** with the default token; set a real one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 
 ---
 
 ## Security & Safety
 
-**Safe Mode** is enabled by default (`RESQ_SAFE_MODE=true`). In this state, any tool that performs platform mutations (e.g., dispatching a drone swarm or starting a high-fidelity simulation) will raise a `FastMCPError`. This allows AI agents to plan missions safely without triggering real-world consequences. Disable this only when you are ready for autonomous execution.
+resq-mcp is hardened against the concerns in NSA Cybersecurity Information sheet
+*Model Context Protocol (MCP): Security Design Considerations* (PP-26-1834, May 2026).
+See [SECURITY.md](./SECURITY.md) for the full control-by-control mapping.
+
+- **Safe Mode** (`RESQ_SAFE_MODE=true`, default) — side-effecting tools
+  (`run_simulation`, `update_mission_params`) raise a `FastMCPError` so agents can
+  plan missions without real-world consequences. Disable only for autonomous execution.
+- **Authenticated network transports** — bearer-token auth with constant-time
+  comparison and zero-downtime rotation (`RESQ_API_KEY_PREVIOUS`); a default token on
+  a network listener is refused at startup.
+- **Bounded, validated inputs** — every identifier is checked against an allow-list
+  (rejecting shell/path metacharacters) and all string/parameter fields are length-capped.
+- **Hash-anchored audit logging** — each tool invocation emits a structured JSON record
+  on the `resq-mcp.audit` logger with SHA-256 digests of parameters and results; route it
+  to your SIEM.
+- **Per-tool rate limiting** — a sliding-window limiter resists prompt storms and
+  recursive-call fatigue.
 
 ---
 

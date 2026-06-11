@@ -19,9 +19,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from resq_mcp.core.models import _utc_now
+from resq_mcp.core.validation import (
+    MAX_IDENTIFIER_LENGTH,
+    MAX_SOURCE_LENGTH,
+    MAX_TEXT_LENGTH,
+    validate_identifier,
+)
 
 
 class IncidentReport(BaseModel):
@@ -46,13 +52,19 @@ class IncidentReport(BaseModel):
         reports cross-referenced with PDIE predictions and other sources.
     """
 
-    incident_id: str
+    incident_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     source: Literal["edge_ai", "human_report", "sensor_network"]
-    sector_id: str
-    detected_type: str
-    confidence: float
-    evidence_url: str | None = None
+    sector_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
+    detected_type: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    evidence_url: str | None = Field(default=None, max_length=MAX_TEXT_LENGTH)
     timestamp: datetime = Field(default_factory=_utc_now)
+
+    @field_validator("incident_id", "sector_id", "detected_type")
+    @classmethod
+    def _validate_identifier_fields(cls, value: str, info: ValidationInfo) -> str:
+        """Reject identifiers outside the allow-list (injection/traversal defense)."""
+        return validate_identifier(value, field=info.field_name or "identifier")
 
 
 class IncidentValidation(BaseModel):
@@ -79,11 +91,25 @@ class IncidentValidation(BaseModel):
         ... )
     """
 
-    incident_id: str
+    incident_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     is_confirmed: bool
-    validation_source: str  # e.g., "SpoonOS-Validator"
-    correlated_pre_alert_id: str | None = None
-    notes: str
+    validation_source: str = Field(..., min_length=1, max_length=MAX_SOURCE_LENGTH)
+    correlated_pre_alert_id: str | None = Field(default=None, max_length=MAX_IDENTIFIER_LENGTH)
+    notes: str = Field(..., max_length=MAX_TEXT_LENGTH)
+
+    @field_validator("incident_id")
+    @classmethod
+    def _validate_incident_id(cls, value: str) -> str:
+        """Constrain the incident ID to the identifier allow-list."""
+        return validate_identifier(value, field="incident_id")
+
+    @field_validator("correlated_pre_alert_id")
+    @classmethod
+    def _validate_correlated_id(cls, value: str | None) -> str | None:
+        """Constrain the optional correlated pre-alert ID when present."""
+        if value is None:
+            return value
+        return validate_identifier(value, field="correlated_pre_alert_id")
 
 
 class MissionParameters(BaseModel):

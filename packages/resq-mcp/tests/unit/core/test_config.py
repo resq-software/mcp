@@ -66,6 +66,26 @@ class TestSettings:
             settings = Settings()
             assert settings.SAFE_MODE is False
 
+    def test_security_feature_flag_defaults(self) -> None:
+        """Audit and rate-limit controls are enabled with sane defaults."""
+        settings = Settings()
+        assert settings.AUDIT_ENABLED is True
+        assert settings.RATE_LIMIT_ENABLED is True
+        assert settings.RATE_LIMIT_MAX_CALLS == 60
+        assert settings.RATE_LIMIT_WINDOW_SECONDS == 60
+        assert settings.API_KEY_PREVIOUS == ""
+        assert settings.API_KEY_GRACE_SECONDS == 3600
+
+    def test_rate_limit_window_can_be_tuned(self) -> None:
+        """Rate-limit window/size are overridable via environment."""
+        with patch.dict(
+            os.environ,
+            {"RESQ_RATE_LIMIT_MAX_CALLS": "5", "RESQ_RATE_LIMIT_WINDOW_SECONDS": "30"},
+        ):
+            settings = Settings()
+            assert settings.RATE_LIMIT_MAX_CALLS == 5
+            assert settings.RATE_LIMIT_WINDOW_SECONDS == 30
+
     def test_transport_defaults_to_stdio(self) -> None:
         """Transport defaults to stdio so client-spawned usage is unchanged."""
         assert Settings().TRANSPORT == "stdio"
@@ -118,3 +138,34 @@ class TestValidateEnvironment:
         from resq_mcp.core.config import validate_environment
 
         validate_environment(require_api_key=False)
+
+    def test_network_transport_requires_nondefault_key(self) -> None:
+        """A network transport auto-requires a non-default token."""
+        from resq_mcp.core.config import ConfigurationError, settings, validate_environment
+
+        with (
+            patch.object(settings, "TRANSPORT", "http"),
+            patch.object(settings, "API_KEY", "resq-dev-token"),
+            pytest.raises(ConfigurationError, match="non-default"),
+        ):
+            validate_environment()
+
+    def test_network_transport_passes_with_real_key(self) -> None:
+        """A network transport with a real token validates cleanly."""
+        from resq_mcp.core.config import settings, validate_environment
+
+        with (
+            patch.object(settings, "TRANSPORT", "sse"),
+            patch.object(settings, "API_KEY", "prod-token-abc123"),
+        ):
+            validate_environment()
+
+    def test_stdio_transport_allows_default_key(self) -> None:
+        """stdio is not network-reachable, so the default token is acceptable."""
+        from resq_mcp.core.config import settings, validate_environment
+
+        with (
+            patch.object(settings, "TRANSPORT", "stdio"),
+            patch.object(settings, "API_KEY", "resq-dev-token"),
+        ):
+            validate_environment()

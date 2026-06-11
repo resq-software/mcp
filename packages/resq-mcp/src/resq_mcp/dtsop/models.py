@@ -18,7 +18,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
+
+from resq_mcp.core.validation import (
+    MAX_IDENTIFIER_LENGTH,
+    validate_identifier,
+    validate_parameters,
+)
 
 
 class SimulationRequest(BaseModel):
@@ -39,11 +45,23 @@ class SimulationRequest(BaseModel):
         simulation ID and resource subscription (resq://simulations/{id}).
     """
 
-    scenario_id: str
-    sector_id: str
-    disaster_type: str
+    scenario_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
+    sector_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
+    disaster_type: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     parameters: dict[str, float | str]  # e.g., wind_speed, water_level
     priority: Literal["standard", "urgent"] = "standard"
+
+    @field_validator("scenario_id", "sector_id", "disaster_type")
+    @classmethod
+    def _validate_identifier_fields(cls, value: str, info: ValidationInfo) -> str:
+        """Reject identifiers outside the allow-list (injection/traversal defense)."""
+        return validate_identifier(value, field=info.field_name or "identifier")
+
+    @field_validator("parameters")
+    @classmethod
+    def _validate_parameter_bounds(cls, value: dict[str, float | str]) -> dict[str, float | str]:
+        """Bound the size of the parameters mapping and its string values."""
+        return validate_parameters(value)
 
 
 class OptimizationStrategy(BaseModel):
