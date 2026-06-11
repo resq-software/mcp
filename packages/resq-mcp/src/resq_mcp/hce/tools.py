@@ -25,6 +25,8 @@ from datetime import UTC, datetime
 
 from fastmcp.exceptions import FastMCPError
 
+from resq_mcp.core.audit import audit_log
+from resq_mcp.core.guards import preflight
 from resq_mcp.hce.models import IncidentValidation, MissionParameters
 from resq_mcp.hce.service import update_mission_params as _update_mission_params
 from resq_mcp.server import MAX_INCIDENTS, MAX_MISSIONS, incidents, mcp, missions
@@ -75,6 +77,10 @@ async def validate_incident(val: IncidentValidation) -> str:
         All validations logged with timestamp, source, and reasoning
         for post-incident analysis and ML model refinement.
     """
+    # Preflight: rate-limit (DoS mitigation). The incident_id and all other fields
+    # were already validated and bounded by the IncidentValidation schema.
+    preflight("validate_incident", mutating=False)
+
     action = "CONFIRMED" if val.is_confirmed else "REJECTED"
     # Normalise to uppercase so "inc-123" and "INC-123" refer to the same incident.
     # get_deployment_strategy also normalises to uppercase on lookup.
@@ -112,6 +118,14 @@ async def validate_incident(val: IncidentValidation) -> str:
         val.validation_source,
     )
     logger.debug("Incident %s notes: %s", incident_key, val.notes)
+    audit_log(
+        "validate_incident",
+        status="recorded",
+        actor=val.validation_source,
+        parameters=val.model_dump(),
+        result={"incident_id": incident_key, "action": action},
+        incident_id=incident_key,
+    )
     return f"Incident {val.incident_id} successfully {action}."
 
 
@@ -146,6 +160,14 @@ async def update_mission_params(
         >>> print(params.authorized_actions)
         >>> print(params.strategy_hash)  # 0xSHA256(strategy_id:mission_id)
     """
+    # Preflight: rate-limit, validate the raw drone_id/strategy_id arguments, then
+    # block under Safe Mode — pushing parameters to a drone is a real-world action.
+    preflight(
+        "update_mission_params",
+        mutating=True,
+        identifiers={"drone_id": drone_id, "strategy_id": strategy_id},
+    )
+
     if drone_id in missions:
         existing = missions[drone_id]
         if existing["strategy_id"] != strategy_id:
@@ -190,5 +212,14 @@ async def update_mission_params(
         drone_id,
         strategy_id,
         is_urgent,
+    )
+    audit_log(
+        "update_mission_params",
+        status="dispatched",
+        parameters={"drone_id": drone_id, "strategy_id": strategy_id, "is_urgent": is_urgent},
+        result=result.model_dump(),
+        drone_id=drone_id,
+        strategy_id=strategy_id,
+        mission_id=result.mission_id,
     )
     return result

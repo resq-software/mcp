@@ -45,11 +45,17 @@ class TestMainTransportSelection:
         run.assert_called_once_with()
 
     def test_http_transport_binds_host_and_port(self) -> None:
-        """A network transport forwards transport, host, and port to mcp.run()."""
+        """A network transport forwards transport, host, and port to mcp.run().
+
+        Network transports require a non-default API key (NSA PP-26-1834: an
+        unauthenticated network listener is an open MCP server), so a real token
+        is supplied here.
+        """
         run = MagicMock()
         with (
             patch.object(server.mcp, "run", run),
             patch.object(server.settings, "TRANSPORT", "http"),
+            patch.object(server.settings, "API_KEY", "test-network-token-abc123"),
             patch.object(server.settings, "HOST", "127.0.0.1"),
             patch.object(server.settings, "PORT", 9001),
         ):
@@ -58,17 +64,35 @@ class TestMainTransportSelection:
         run.assert_called_once_with(transport="http", host="127.0.0.1", port=9001)
 
     def test_sse_transport_binds_host_and_port(self) -> None:
-        """The sse transport is also wired to host/port."""
+        """The sse transport is also wired to host/port (with a real token)."""
         run = MagicMock()
         with (
             patch.object(server.mcp, "run", run),
             patch.object(server.settings, "TRANSPORT", "sse"),
+            patch.object(server.settings, "API_KEY", "test-network-token-abc123"),
             patch.object(server.settings, "HOST", "0.0.0.0"),
             patch.object(server.settings, "PORT", 8000),
         ):
             server.main()
 
         run.assert_called_once_with(transport="sse", host="0.0.0.0", port=8000)
+
+    def test_network_transport_without_token_is_refused(self) -> None:
+        """A network transport with the default dev token fails fast before binding."""
+        import pytest
+
+        from resq_mcp.core.config import ConfigurationError
+
+        run = MagicMock()
+        with (
+            patch.object(server.mcp, "run", run),
+            patch.object(server.settings, "TRANSPORT", "http"),
+            patch.object(server.settings, "API_KEY", "resq-dev-token"),
+            pytest.raises(ConfigurationError, match="non-default value"),
+        ):
+            server.main()
+
+        run.assert_not_called()
 
     def test_main_validates_environment_before_running(self) -> None:
         """validate_environment() runs before the server starts."""

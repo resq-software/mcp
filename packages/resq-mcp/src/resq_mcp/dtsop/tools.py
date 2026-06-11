@@ -25,6 +25,8 @@ from datetime import UTC, datetime
 from fastmcp import Context
 from fastmcp.exceptions import FastMCPError
 
+from resq_mcp.core.audit import audit_log
+from resq_mcp.core.guards import preflight
 from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
 from resq_mcp.dtsop.service import get_optimization_strategy
 from resq_mcp.dtsop.service import run_simulation as trigger_sim
@@ -84,6 +86,11 @@ async def run_simulation(request: SimulationRequest, ctx: Context | None = None)
         - Submit to Unity/Unreal Engine processing cluster
         - Return estimated completion time
     """
+    # Preflight: rate-limit, then block under Safe Mode (this is a side-effecting
+    # tool that queues real compute). Identifier fields were already validated by
+    # the SimulationRequest schema, so no raw identifiers need re-checking here.
+    preflight("run_simulation", mutating=True)
+
     logger.info("Received Simulation Request: %s", request.scenario_id)
 
     active_sim_count = sum(
@@ -102,6 +109,16 @@ async def run_simulation(request: SimulationRequest, ctx: Context | None = None)
         "request": request.model_dump(),
         "created_at": datetime.now(UTC).isoformat(),
     }
+
+    audit_log(
+        "run_simulation",
+        status="accepted",
+        actor=getattr(ctx, "client_id", None),
+        parameters=request.model_dump(),
+        result={"sim_id": sim_id},
+        scenario_id=request.scenario_id,
+        sector_id=request.sector_id,
+    )
 
     if ctx:
         await ctx.info(f"Simulation {sim_id} queued. Monitor at resq://simulations/{sim_id}")
@@ -149,6 +166,14 @@ async def get_deployment_strategy(incident_id: str) -> OptimizationStrategy:
         Strategy linked to blockchain for immutable audit trail.
         After approval, use update_mission_params to push to drones.
     """
+    # Preflight: rate-limit and validate the raw incident_id argument against the
+    # identifier allow-list before it is used for store lookups or strategy lookup.
+    preflight(
+        "get_deployment_strategy",
+        mutating=False,
+        identifiers={"incident_id": incident_id},
+    )
+
     # Validate confirmed incident IDs against the incidents store.
     # PRE- (PDIE pre-alert) and other non-INC- IDs bypass this check since they
     # are not submitted through validate_incident.
@@ -167,4 +192,13 @@ async def get_deployment_strategy(incident_id: str) -> OptimizationStrategy:
                 "Deployment strategies are only generated for confirmed incidents."
             )
 
-    return get_optimization_strategy(incident_id)
+    strategy = get_optimization_strategy(incident_id)
+    audit_log(
+        "get_deployment_strategy",
+        status="accepted",
+        parameters={"incident_id": incident_id},
+        result=strategy.model_dump(),
+        incident_id=incident_id,
+        strategy_id=strategy.strategy_id,
+    )
+    return strategy

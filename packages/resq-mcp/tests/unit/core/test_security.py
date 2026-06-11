@@ -103,3 +103,72 @@ class TestVerifyApiKey:
         with pytest.raises(HTTPException) as exc_info:
             verify_api_key(request)
         assert exc_info.value.status_code == 403
+
+
+class TestKeyRing:
+    """Tests for bearer-token rotation with a grace window."""
+
+    def test_active_token_verifies(self) -> None:
+        from resq_mcp.core.security import KeyRing
+
+        ring = KeyRing(active="primary-token")
+        assert ring.active == "primary-token"
+        assert ring.verify("primary-token") is True
+        assert ring.verify("nope") is False
+        assert ring.verify("") is False
+
+    def test_rotation_keeps_previous_valid_during_grace(self) -> None:
+        from resq_mcp.core.security import KeyRing
+
+        ring = KeyRing(active="old-token", grace_seconds=3600)
+        new = ring.rotate("new-token")
+        assert new == "new-token"
+        assert ring.active == "new-token"
+        assert ring.verify("new-token") is True
+        # The rotated-out token stays valid within the grace window.
+        assert ring.verify("old-token") is True
+
+    def test_previous_token_expires_after_grace(self) -> None:
+        from resq_mcp.core.security import KeyRing
+
+        # Zero-second grace means the previous token is invalid immediately.
+        ring = KeyRing(active="old-token", grace_seconds=0)
+        ring.rotate("new-token")
+        assert ring.verify("new-token") is True
+        assert ring.verify("old-token") is False
+
+    def test_rotate_generates_token_when_none_supplied(self) -> None:
+        from resq_mcp.core.security import KeyRing
+
+        ring = KeyRing(active="seed")
+        generated = ring.rotate()
+        assert generated != "seed"
+        assert len(generated) >= 32
+        assert ring.verify(generated) is True
+
+    def test_seeded_previous_token_is_honoured(self) -> None:
+        from resq_mcp.core.security import KeyRing
+
+        ring = KeyRing(active="active", previous="prior", grace_seconds=3600)
+        assert ring.verify("prior") is True
+
+
+class TestRequireMutationAllowed:
+    """Tests for the Safe Mode mutation gate."""
+
+    def test_raises_when_safe_mode_enabled(self) -> None:
+        from fastmcp.exceptions import FastMCPError
+
+        from resq_mcp.core import security
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(security.settings, "SAFE_MODE", True)
+            with pytest.raises(FastMCPError, match="RESQ_SAFE_MODE"):
+                security.require_mutation_allowed("run_simulation")
+
+    def test_passes_when_safe_mode_disabled(self) -> None:
+        from resq_mcp.core import security
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(security.settings, "SAFE_MODE", False)
+            security.require_mutation_allowed("run_simulation")
