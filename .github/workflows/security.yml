@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   scan:
-    uses: resq-software/.github/.github/workflows/security-scan.yml@ee2001974be1e5610cff3a2c669cfab95c7415e7 # main
+    uses: resq-software/.github/.github/workflows/security-scan.yml@73b9edb8f4f28a99f70ee22eb5e2dd2bf7807c84 # main
     with:
       languages: '["python","actions"]'
       enable-semgrep: true
