@@ -45,9 +45,7 @@ class TestPreflight:
         with pytest.raises(FastMCPError, match="disallowed characters"):
             preflight("update_mission_params", identifiers={"drone_id": "bad id; rm -rf"})
 
-    def test_rate_limit_breach_raises_fastmcp_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_rate_limit_breach_raises_fastmcp_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from resq_mcp.core import ratelimit
 
         monkeypatch.setattr(ratelimit.settings, "RATE_LIMIT_ENABLED", True)

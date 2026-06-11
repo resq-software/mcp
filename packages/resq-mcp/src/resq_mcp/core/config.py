@@ -169,6 +169,6 @@ def validate_environment(require_api_key: bool = False) -> None:
         raise ConfigurationError(
             "RESQ_API_KEY must be set to a non-default value when authentication is "
             f"required (transport={s.TRANSPORT!r}). Generate one with "
-            "`python -c \"import secrets; print(secrets.token_urlsafe(32))\"` and set "
+            '`python -c "import secrets; print(secrets.token_urlsafe(32))"` and set '
             "the RESQ_API_KEY environment variable."
         )
