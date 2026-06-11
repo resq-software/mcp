@@ -77,6 +77,20 @@ class TestMainTransportSelection:
 
         run.assert_called_once_with(transport="sse", host="0.0.0.0", port=8000)
 
+    def test_streamable_http_transport_binds_host_and_port(self) -> None:
+        """The streamable-http transport is also wired to host/port (with a real token)."""
+        run = MagicMock()
+        with (
+            patch.object(server.mcp, "run", run),
+            patch.object(server.settings, "TRANSPORT", "streamable-http"),
+            patch.object(server.settings, "API_KEY", "test-network-token-abc123"),
+            patch.object(server.settings, "HOST", "127.0.0.1"),
+            patch.object(server.settings, "PORT", 9002),
+        ):
+            server.main()
+
+        run.assert_called_once_with(transport="streamable-http", host="127.0.0.1", port=9002)
+
     def test_network_transport_without_token_is_refused(self) -> None:
         """A network transport with the default dev token fails fast before binding."""
         import pytest

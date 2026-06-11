@@ -97,6 +97,14 @@ async def run_simulation(request: SimulationRequest, ctx: Context | None = None)
         1 for d in simulations.values() if d.get("status") in ("pending", "processing")
     )
     if active_sim_count >= MAX_SIMULATIONS:
+        audit_log(
+            "run_simulation",
+            status="denied",
+            actor=getattr(ctx, "client_id", None),
+            parameters=request.model_dump(),
+            scenario_id=request.scenario_id,
+            reason="capacity_reached",
+        )
         raise FastMCPError(
             f"Simulation capacity reached ({MAX_SIMULATIONS} active jobs). "
             "Wait for existing simulations to complete before submitting new ones."
@@ -182,11 +190,25 @@ async def get_deployment_strategy(incident_id: str) -> OptimizationStrategy:
         # validate_incident also normalises keys to uppercase on write.
         state = incidents.get(incident_id.upper())
         if state is None:
+            audit_log(
+                "get_deployment_strategy",
+                status="denied",
+                parameters={"incident_id": incident_id},
+                incident_id=incident_id,
+                reason="incident_not_found",
+            )
             raise FastMCPError(
                 f"Incident {incident_id} not found. "
                 "Submit it via validate_incident before requesting a strategy."
             )
         if not state["is_confirmed"]:
+            audit_log(
+                "get_deployment_strategy",
+                status="denied",
+                parameters={"incident_id": incident_id},
+                incident_id=incident_id,
+                reason="incident_rejected",
+            )
             raise FastMCPError(
                 f"Incident {incident_id} was rejected. "
                 "Deployment strategies are only generated for confirmed incidents."

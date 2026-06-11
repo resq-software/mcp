@@ -221,7 +221,7 @@ Control server behavior via environment variables or a `.env` file:
 | `RESQ_API_KEY_GRACE_SECONDS` | Seconds a rotated-out token stays valid | `3600` |
 | `RESQ_SAFE_MODE` | Prevents destructive mutations | `true` |
 | `RESQ_TRANSPORT` | Transport: `stdio`, `http`, `sse`, `streamable-http` | `stdio` |
-| `RESQ_PORT` | Port for network (HTTP/SSE) mode | `8000` |
+| `RESQ_PORT` | Port for network transport (`http`/`sse`/`streamable-http`) | `8000` |
 | `RESQ_HOST` | Host to bind the network server | `0.0.0.0` |
 | `RESQ_AUDIT_ENABLED` | Emit hash-anchored audit records (`resq-mcp.audit`) | `true` |
 | `RESQ_RATE_LIMIT_ENABLED` | Enforce per-tool call-rate limits | `true` |

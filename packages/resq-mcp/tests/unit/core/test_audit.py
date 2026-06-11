@@ -84,3 +84,20 @@ class TestAuditLog:
         with caplog.at_level(logging.INFO, logger="resq-mcp.audit"):
             audit_log("run_simulation", status="accepted")
         assert caplog.records == []
+
+    def test_extra_cannot_overwrite_canonical_fields(self, caplog: LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO, logger="resq-mcp.audit"):
+            hostile = {
+                "event": "forged",
+                "transport": "evil",
+                "safe_mode": "lie",
+                "incident_id": "INC-9",
+            }
+            # Reserved keys in extras must be dropped; non-reserved ones kept.
+            audit_log("run_simulation", status="accepted", **hostile)
+        record = json.loads(caplog.records[-1].getMessage())
+        assert record["event"] == "mcp.tool.invocation"
+        assert record["transport"] != "evil"
+        assert record["safe_mode"] is not None
+        # Non-reserved extras are still recorded.
+        assert record["incident_id"] == "INC-9"

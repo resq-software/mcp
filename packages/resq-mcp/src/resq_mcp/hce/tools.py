@@ -87,6 +87,14 @@ async def validate_incident(val: IncidentValidation) -> str:
     incident_key = val.incident_id.upper()
 
     if len(incidents) >= MAX_INCIDENTS and incident_key not in incidents:
+        audit_log(
+            "validate_incident",
+            status="denied",
+            actor=val.validation_source,
+            parameters=val.model_dump(),
+            incident_id=incident_key,
+            reason="capacity_reached",
+        )
         raise FastMCPError(
             f"Incident store capacity reached ({MAX_INCIDENTS}). "
             "Old records are evicted after one hour; try again shortly."
@@ -97,6 +105,14 @@ async def validate_incident(val: IncidentValidation) -> str:
         existing = incidents[incident_key]
         if existing["is_confirmed"] != val.is_confirmed:
             existing_action = "CONFIRMED" if existing["is_confirmed"] else "REJECTED"
+            audit_log(
+                "validate_incident",
+                status="denied",
+                actor=val.validation_source,
+                parameters=val.model_dump(),
+                incident_id=incident_key,
+                reason="conflicting_revalidation",
+            )
             return (
                 f"Conflict: Incident {val.incident_id} was already {existing_action} "
                 f"by {existing['validation_source']}. "
@@ -168,15 +184,27 @@ async def update_mission_params(
         identifiers={"drone_id": drone_id, "strategy_id": strategy_id},
     )
 
+    def _audit_denied(reason: str) -> None:
+        audit_log(
+            "update_mission_params",
+            status="denied",
+            parameters={"drone_id": drone_id, "strategy_id": strategy_id, "is_urgent": is_urgent},
+            drone_id=drone_id,
+            strategy_id=strategy_id,
+            reason=reason,
+        )
+
     if drone_id in missions:
         existing = missions[drone_id]
         if existing["strategy_id"] != strategy_id:
+            _audit_denied("strategy_conflict")
             raise FastMCPError(
                 f"Drone {drone_id} already has an active mission for strategy "
                 f"{existing['strategy_id']}. The prior mission must complete or be "
                 f"cleared before dispatching a new one."
             )
         if existing.get("is_urgent", False) != is_urgent:
+            _audit_denied("urgency_escalation_blocked")
             raise FastMCPError(
                 f"Drone {drone_id} already has an active mission for strategy "
                 f"{strategy_id} with is_urgent={existing.get('is_urgent', False)}. Cannot change "
@@ -189,6 +217,7 @@ async def update_mission_params(
         return MissionParameters(**existing["params"])
 
     elif len(missions) >= MAX_MISSIONS:
+        _audit_denied("capacity_reached")
         raise FastMCPError(
             f"Mission store capacity reached ({MAX_MISSIONS}). "
             "Clear completed missions before dispatching new ones."
@@ -198,6 +227,7 @@ async def update_mission_params(
 
     result = _update_mission_params(drone_id, strategy_id, is_urgent)
     if isinstance(result, ErrorResponse):
+        _audit_denied("backend_error")
         raise FastMCPError(result.message)
 
     missions[drone_id] = {

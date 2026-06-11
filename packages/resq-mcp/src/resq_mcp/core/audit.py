@@ -37,6 +37,21 @@ from resq_mcp.core.config import settings
 
 audit_logger = logging.getLogger("resq-mcp.audit")
 
+# Canonical record fields that callers must not be able to overwrite via **extra,
+# preserving audit-trail integrity.
+_RESERVED_FIELDS = frozenset(
+    {
+        "event",
+        "action",
+        "status",
+        "actor",
+        "transport",
+        "safe_mode",
+        "parameters_hash",
+        "result_hash",
+    }
+)
+
 
 def _stable_default(obj: Any) -> Any:
     """Serialiser fallback that keeps the digest deterministic.
@@ -106,6 +121,7 @@ def audit_log(
         record["parameters_hash"] = hash_payload(parameters)
     if result is not None:
         record["result_hash"] = hash_payload(result)
-    record.update(extra)
+    # Never let caller-supplied extras clobber canonical fields.
+    record.update({k: v for k, v in extra.items() if k not in _RESERVED_FIELDS})
 
     audit_logger.info(json.dumps(record, sort_keys=True, default=str))

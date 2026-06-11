@@ -80,6 +80,34 @@ class TestSafeModeGate:
         assert "Simulation queued" in result
 
 
+class TestDeniedOutcomesAreAudited:
+    """Rejection paths emit audit records, not just the accepted path."""
+
+    @pytest.mark.asyncio
+    async def test_get_deployment_strategy_denied_is_audited(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import json
+
+        from fastmcp.exceptions import FastMCPError
+
+        from resq_mcp.dtsop.tools import get_deployment_strategy
+        from resq_mcp.server import incidents
+
+        incidents.clear()
+        import logging
+
+        with (
+            caplog.at_level(logging.INFO, logger="resq-mcp.audit"),
+            pytest.raises(FastMCPError, match="not found"),
+        ):
+            await get_deployment_strategy("INC-MISSING-001")
+
+        records = [json.loads(r.getMessage()) for r in caplog.records]
+        denied = [r for r in records if r.get("status") == "denied"]
+        assert any(r["reason"] == "incident_not_found" for r in denied)
+
+
 class TestBoundedIdentifierInputs:
     """Request models reject out-of-policy identifiers and oversized fields."""
 
