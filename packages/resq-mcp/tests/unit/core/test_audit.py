@@ -43,6 +43,11 @@ class TestHashPayload:
         # object() is not JSON-serialisable; default=str must keep hashing total.
         assert len(hash_payload({"obj": object()})) == 64
 
+    def test_set_values_hash_deterministically(self) -> None:
+        # Sets have no inherent order; the digest must not depend on insertion order.
+        assert hash_payload({"s": {3, 1, 2}}) == hash_payload({"s": {2, 3, 1}})
+        assert hash_payload({"s": frozenset({"b", "a"})}) == hash_payload({"s": {"a", "b"}})
+
 
 class TestAuditLog:
     def test_emits_record_with_hashes(self, caplog: LogCaptureFixture) -> None:

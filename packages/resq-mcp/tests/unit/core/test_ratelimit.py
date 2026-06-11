@@ -82,3 +82,21 @@ class TestEnforceRateLimit:
         enforce_rate_limit("tool")
         with pytest.raises(RateLimitExceeded):
             enforce_rate_limit("tool")
+
+
+class TestDynamicConfig:
+    def test_argless_limiter_tracks_live_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from resq_mcp.core import ratelimit
+
+        limiter = RateLimiter()  # no explicit args -> reads settings live
+        monkeypatch.setattr(ratelimit.settings, "RATE_LIMIT_MAX_CALLS", 7)
+        monkeypatch.setattr(ratelimit.settings, "RATE_LIMIT_WINDOW_SECONDS", 30)
+        assert limiter.max_calls == 7
+        assert limiter.window_seconds == 30
+
+    def test_explicit_override_wins_over_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from resq_mcp.core import ratelimit
+
+        monkeypatch.setattr(ratelimit.settings, "RATE_LIMIT_MAX_CALLS", 7)
+        limiter = RateLimiter(max_calls=2)
+        assert limiter.max_calls == 2

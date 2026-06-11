@@ -38,11 +38,24 @@ from resq_mcp.core.config import settings
 audit_logger = logging.getLogger("resq-mcp.audit")
 
 
+def _stable_default(obj: Any) -> Any:
+    """Serialiser fallback that keeps the digest deterministic.
+
+    Sets and frozensets have no inherent order, so their ``str`` repr varies
+    across processes (hash randomisation). Sorting them yields a stable encoding;
+    everything else falls back to ``str`` so hashing never raises.
+    """
+    if isinstance(obj, (set, frozenset)):
+        return sorted(obj, key=repr)
+    return str(obj)
+
+
 def hash_payload(payload: Any) -> str:
     """Return a stable SHA-256 hex digest of a JSON-serialisable payload.
 
     Keys are sorted so the digest is deterministic regardless of dict ordering,
-    and non-serialisable values fall back to ``str`` so hashing never raises.
+    sets are sorted, and any other non-serialisable value falls back to ``str``
+    so hashing never raises.
 
     Args:
         payload: Any JSON-serialisable object (dict, list, scalar).
@@ -50,7 +63,7 @@ def hash_payload(payload: Any) -> str:
     Returns:
         The 64-character hex SHA-256 digest of the canonical JSON encoding.
     """
-    serialised = json.dumps(payload, sort_keys=True, default=str)
+    serialised = json.dumps(payload, sort_keys=True, default=_stable_default)
     return hashlib.sha256(serialised.encode("utf-8")).hexdigest()
 
 

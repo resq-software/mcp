@@ -54,17 +54,40 @@ class RateLimiter:
     of in-window calls has reached the limit.
     """
 
-    def __init__(self, max_calls: int, window_seconds: int) -> None:
+    def __init__(self, max_calls: int | None = None, window_seconds: int | None = None) -> None:
         """Initialise the limiter.
 
         Args:
-            max_calls: Maximum number of calls permitted per key per window.
-            window_seconds: Width of the sliding window, in seconds.
+            max_calls: Maximum number of calls permitted per key per window. When
+                ``None`` the value is read live from ``settings.RATE_LIMIT_MAX_CALLS``
+                so runtime configuration changes take effect without re-instantiation.
+            window_seconds: Width of the sliding window, in seconds. When ``None`` the
+                value is read live from ``settings.RATE_LIMIT_WINDOW_SECONDS``.
         """
-        self.max_calls = max_calls
-        self.window_seconds = window_seconds
+        self._max_calls = max_calls
+        self._window_seconds = window_seconds
         self._events: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
+
+    @property
+    def max_calls(self) -> int:
+        """Effective per-window call cap (explicit override or live setting)."""
+        return self._max_calls if self._max_calls is not None else settings.RATE_LIMIT_MAX_CALLS
+
+    @max_calls.setter
+    def max_calls(self, value: int) -> None:
+        self._max_calls = value
+
+    @property
+    def window_seconds(self) -> int:
+        """Effective window width in seconds (explicit override or live setting)."""
+        if self._window_seconds is not None:
+            return self._window_seconds
+        return settings.RATE_LIMIT_WINDOW_SECONDS
+
+    @window_seconds.setter
+    def window_seconds(self, value: int) -> None:
+        self._window_seconds = value
 
     def check(self, key: str, *, now: float | None = None) -> None:
         """Record a call for ``key`` and raise if it breaches the limit.
@@ -96,12 +119,10 @@ class RateLimiter:
                 self._events.pop(key, None)
 
 
-# Module-level singleton configured from settings. Tests reset it between cases
-# via the autouse fixture in tests/conftest.py.
-rate_limiter = RateLimiter(
-    max_calls=settings.RATE_LIMIT_MAX_CALLS,
-    window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
-)
+# Module-level singleton. With no explicit args it tracks the live ``settings``
+# values, so runtime configuration changes apply without re-instantiation. Tests
+# reset it between cases via the autouse fixture in tests/conftest.py.
+rate_limiter = RateLimiter()
 
 
 def enforce_rate_limit(tool: str) -> None:

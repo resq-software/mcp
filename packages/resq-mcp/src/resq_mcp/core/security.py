@@ -94,14 +94,20 @@ class KeyRing:
             return new
 
     def verify(self, token: str) -> bool:
-        """Return True if ``token`` matches the active or (unexpired) previous token."""
+        """Return True if ``token`` matches the active or (unexpired) previous token.
+
+        Reads are taken under the lock so a concurrent :meth:`rotate` cannot expose
+        a torn view of the active/previous slots (which would transiently 403 a
+        valid token).
+        """
         if not token:
             return False
-        if secrets.compare_digest(token, self._active):
-            return True
-        deadline = self._previous_expires_at
-        if self._previous and deadline is not None and time.monotonic() < deadline:
-            return secrets.compare_digest(token, self._previous)
+        with self._lock:
+            if secrets.compare_digest(token, self._active):
+                return True
+            deadline = self._previous_expires_at
+            if self._previous and deadline is not None and time.monotonic() < deadline:
+                return secrets.compare_digest(token, self._previous)
         return False
 
 
