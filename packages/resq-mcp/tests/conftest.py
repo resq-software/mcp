@@ -26,7 +26,7 @@ from resq_mcp.dtsop.models import SimulationRequest
 from resq_mcp.hce.models import IncidentReport, IncidentValidation
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
 
 @pytest.fixture(autouse=True)
@@ -37,6 +37,31 @@ def reset_random_seed() -> None:
     so we don't actually set a seed globally. Individual tests can
     set seeds if needed for specific reproducibility.
     """
+
+
+@pytest.fixture(autouse=True)
+def _reset_security_state() -> Iterator[None]:
+    """Isolate per-test security state for the hardened tool wrappers.
+
+    - Clears the process-wide per-tool rate limiter so call counts do not leak
+      across tests (a shared sliding window would otherwise cause flaky limits).
+    - Disables Safe Mode for the duration of each test so mutating tool wrappers
+      exercise their real execution paths. Tests that specifically assert the
+      Safe Mode gate re-enable it explicitly via monkeypatch.
+
+    The original ``SAFE_MODE`` value is restored afterwards.
+    """
+    from resq_mcp.core.config import settings
+    from resq_mcp.core.ratelimit import rate_limiter
+
+    rate_limiter.reset()
+    original_safe_mode = settings.SAFE_MODE
+    settings.SAFE_MODE = False
+    try:
+        yield
+    finally:
+        settings.SAFE_MODE = original_safe_mode
+        rate_limiter.reset()
 
 
 @pytest.fixture

@@ -25,6 +25,8 @@ from datetime import UTC, datetime
 from fastmcp import Context
 from fastmcp.exceptions import FastMCPError
 
+from resq_mcp.core.audit import audit_log
+from resq_mcp.core.guards import preflight
 from resq_mcp.dtsop.models import OptimizationStrategy, SimulationRequest
 from resq_mcp.dtsop.service import get_optimization_strategy
 from resq_mcp.dtsop.service import run_simulation as trigger_sim
@@ -84,12 +86,25 @@ async def run_simulation(request: SimulationRequest, ctx: Context | None = None)
         - Submit to Unity/Unreal Engine processing cluster
         - Return estimated completion time
     """
+    # Preflight: rate-limit, then block under Safe Mode (this is a side-effecting
+    # tool that queues real compute). Identifier fields were already validated by
+    # the SimulationRequest schema, so no raw identifiers need re-checking here.
+    preflight("run_simulation", mutating=True)
+
     logger.info("Received Simulation Request: %s", request.scenario_id)
 
     active_sim_count = sum(
         1 for d in simulations.values() if d.get("status") in ("pending", "processing")
     )
     if active_sim_count >= MAX_SIMULATIONS:
+        audit_log(
+            "run_simulation",
+            status="denied",
+            actor=getattr(ctx, "client_id", None),
+            parameters=request.model_dump(),
+            scenario_id=request.scenario_id,
+            reason="capacity_reached",
+        )
         raise FastMCPError(
             f"Simulation capacity reached ({MAX_SIMULATIONS} active jobs). "
             "Wait for existing simulations to complete before submitting new ones."
@@ -102,6 +117,16 @@ async def run_simulation(request: SimulationRequest, ctx: Context | None = None)
         "request": request.model_dump(),
         "created_at": datetime.now(UTC).isoformat(),
     }
+
+    audit_log(
+        "run_simulation",
+        status="accepted",
+        actor=getattr(ctx, "client_id", None),
+        parameters=request.model_dump(),
+        result={"sim_id": sim_id},
+        scenario_id=request.scenario_id,
+        sector_id=request.sector_id,
+    )
 
     if ctx:
         await ctx.info(f"Simulation {sim_id} queued. Monitor at resq://simulations/{sim_id}")
@@ -149,6 +174,14 @@ async def get_deployment_strategy(incident_id: str) -> OptimizationStrategy:
         Strategy linked to blockchain for immutable audit trail.
         After approval, use update_mission_params to push to drones.
     """
+    # Preflight: rate-limit and validate the raw incident_id argument against the
+    # identifier allow-list before it is used for store lookups or strategy lookup.
+    preflight(
+        "get_deployment_strategy",
+        mutating=False,
+        identifiers={"incident_id": incident_id},
+    )
+
     # Validate confirmed incident IDs against the incidents store.
     # PRE- (PDIE pre-alert) and other non-INC- IDs bypass this check since they
     # are not submitted through validate_incident.
@@ -157,14 +190,37 @@ async def get_deployment_strategy(incident_id: str) -> OptimizationStrategy:
         # validate_incident also normalises keys to uppercase on write.
         state = incidents.get(incident_id.upper())
         if state is None:
+            audit_log(
+                "get_deployment_strategy",
+                status="denied",
+                parameters={"incident_id": incident_id},
+                incident_id=incident_id,
+                reason="incident_not_found",
+            )
             raise FastMCPError(
                 f"Incident {incident_id} not found. "
                 "Submit it via validate_incident before requesting a strategy."
             )
         if not state["is_confirmed"]:
+            audit_log(
+                "get_deployment_strategy",
+                status="denied",
+                parameters={"incident_id": incident_id},
+                incident_id=incident_id,
+                reason="incident_rejected",
+            )
             raise FastMCPError(
                 f"Incident {incident_id} was rejected. "
                 "Deployment strategies are only generated for confirmed incidents."
             )
 
-    return get_optimization_strategy(incident_id)
+    strategy = get_optimization_strategy(incident_id)
+    audit_log(
+        "get_deployment_strategy",
+        status="accepted",
+        parameters={"incident_id": incident_id},
+        result=strategy.model_dump(),
+        incident_id=incident_id,
+        strategy_id=strategy.strategy_id,
+    )
+    return strategy
