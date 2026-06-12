@@ -17,3 +17,29 @@ rules:
       # declare its secrets surface. Once that lands, drop this ignore
       # and switch security.yml back to explicit `SEMGREP_APP_TOKEN`.
       - security.yml
+
+  template-injection:
+    ignore:
+      # All of the workflows below are COMPILED ARTIFACTS produced by the
+      # GitHub Agentic Workflows compiler (`gh aw compile`, see the
+      # `# gh-aw-metadata` / DO NOT EDIT banner at the top of each file).
+      # They must not be hand-edited: the compiler verifies a body/frontmatter
+      # hash and regeneration would overwrite any manual change, so the
+      # injected expressions cannot be durably rewritten into `env:`
+      # indirection here. The flagged expansions are compiler-emitted, not
+      # repository content, and are not attacker-controllable in this repo's
+      # threat model:
+      #   * `${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}` — a numeric
+      #     AI-credit cap sourced from a repository variable that only repo
+      #     admins can set (lock files, 2 sites each).
+      #   * `${{ inputs.operation }}` / `${{ inputs.run_url }}` — workflow_call
+      #     / workflow_dispatch inputs in the maintenance workflow, gated by
+      #     `if:` to specific operation names and to non-fork repositories.
+      # Track the upstream gh-aw compiler; drop these ignores once a compiler
+      # release emits env-var indirection for these values and the lock files
+      # are recompiled.
+      - agentics-maintenance.yml
+      - ai-auditor.lock.yml
+      - auto-triage-issues.lock.yml
+      - daily-secrets-analysis.lock.yml
+      - duplicate-code-detector.lock.yml
