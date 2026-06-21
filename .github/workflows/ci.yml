@@ -132,3 +132,30 @@ jobs:
           enable-cache: true
       - run: uv build
         working-directory: ${{ matrix.dir }}
+
+  # Org template/standards conformance (LICENSE, README, no leftover placeholders).
+  repo-standards:
+    name: Repo standards
+    permissions:
+      contents: read
+    uses: resq-software/.github/.github/workflows/repo-standards.yml@68705d8093f4a0d246573288f7225aefb1c85042
+
+  # Single status-check context consumed by the org ruleset default-branch-baseline.
+  # Replaces the former placeholder required.yml: now gates on the repo's real CI
+  # (lint/typecheck/docstrings/test/build) + repo-standards. Security runs in
+  # security.yml (PR + weekly). Aggregates so `required` is green only when all pass.
+  required:
+    name: required
+    needs: [lint, typecheck, docstrings, test, build, repo-standards]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate required results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -eu
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key)=\(.value.result)"'
+          if echo "$RESULTS" | jq -e 'to_entries[] | select(.value.result != "success" and .value.result != "skipped")' >/dev/null; then
+            echo "::error::one or more required jobs failed"; exit 1
+          fi
