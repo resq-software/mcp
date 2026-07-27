@@ -20,8 +20,12 @@ susceptible to prompt storms and recursive task requests that exhaust resources.
 A sliding-window limiter keyed per tool bounds the call rate so a single tool
 cannot be hammered into a denial-of-service condition.
 
-The limiter is process-local and in-memory. A multi-replica production deployment
-would back it with a shared store (e.g. Redis) so limits hold across instances.
+The limiter is process-local and in-memory: each worker process keeps its own
+counters. It therefore does not enforce an aggregate limit across multiple worker
+processes on a single host, nor across replicas — a client can dilute the limit by
+spreading calls over workers or instances. Any deployment that runs more than one
+worker should back the limiter with a shared store (e.g. Redis) so the limit holds
+globally rather than per process.
 """
 
 from __future__ import annotations
