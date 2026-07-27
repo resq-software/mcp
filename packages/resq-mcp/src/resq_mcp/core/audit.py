@@ -21,15 +21,20 @@ hashes of results or output, forming the backbone of forensic response.
 
 Records are emitted as single-line JSON on the dedicated ``resq-mcp.audit`` logger
 so they can be routed to a SIEM independently of operational logs. Raw parameter
-and result payloads are *hashed* (SHA-256) rather than logged verbatim, so a
-record can confirm whether a payload matches a known reference without persisting
-sensitive content (PII, evidence URLs, mission detail) into log storage.
+and result payloads are *hashed* (SHA-256) rather than logged verbatim, which
+limits raw-data retention and lets a record confirm whether a payload matches a
+known reference. The digest is unsalted and deterministic, so it is **not** a
+confidentiality control: low-entropy or guessable values (a short id, an enum, a
+known URL) can still be recovered by brute force or by matching against candidates.
+Do not treat hashing as licence to pass arbitrary secrets through
+``parameters``/``result``.
 
 Payload hashing is a content-integrity aid, not a tamper-evident log: on its own
 it does not stop an attacker with log access from deleting, reordering, or forging
-records, and it does not bind records into a verifiable chain. Route the
-``resq-mcp.audit`` stream to append-only, access-controlled storage (a WORM or
-SIEM sink) when you need tamper resistance.
+records, and it does not bind records into a verifiable chain. For tamper
+resistance, route the ``resq-mcp.audit`` stream to immutable, access-controlled
+storage — WORM or a retention-locked/immutable SIEM index; a generic SIEM sink is
+not append-only by default.
 """
 
 from __future__ import annotations
@@ -114,7 +119,9 @@ def audit_log(
             pass only small non-sensitive correlation identifiers (e.g.
             ``incident_id="INC-123"``) — never PII, credentials, tokens, or
             evidence URLs. Keys that collide with reserved audit fields are
-            dropped to protect trail integrity.
+            dropped so extras cannot overwrite the canonical fields of that
+            record — this guards a single record's shape, not the trail as a
+            whole.
     """
     if not settings.AUDIT_ENABLED:
         return
