@@ -18,8 +18,11 @@ Provides API key verification for authenticated endpoints using FastAPI's
 HTTPBearer security scheme for token extraction.
 
 Note:
-    This implementation uses a simple comparison against the configured API_KEY.
-    Production deployments should use secure token storage and validation.
+    Tokens are verified against a :class:`KeyRing` (the module-level ``key_ring``)
+    using constant-time comparison, with zero-downtime rotation and a
+    grace-windowed previous token. The ring is seeded from ``API_KEY`` /
+    ``API_KEY_PREVIOUS``. For strict OAuth, terminate authentication at the
+    gateway/ingress rather than relying on this bearer check alone.
 """
 
 from __future__ import annotations
@@ -143,7 +146,10 @@ def require_mutation_allowed(action: str) -> None:
 
 
 def verify_api_key(request: Request) -> str:
-    """Verify the Bearer token against the configured API_KEY.
+    """Verify the Bearer token against the active key ring.
+
+    Delegates to ``key_ring.verify``, which accepts the active token and, during a
+    rotation grace window, the previous token — both compared in constant time.
 
     Used as a dependency for SSE endpoints if wrapping in FastAPI.
     For FastMCP's SSE adapter, authentication may need to be handled
