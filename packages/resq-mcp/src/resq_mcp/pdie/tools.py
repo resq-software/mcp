@@ -91,7 +91,7 @@ async def get_vulnerability_map(sector_id: str) -> VulnerabilityMap:
         "get_vulnerability_map",
         status="accepted",
         parameters={"sector_id": sector_id},
-        result=result.model_dump(),
+        result=result.model_dump(mode="json"),
         sector_id=sector_id,
     )
     return result
@@ -154,7 +154,9 @@ async def get_predictive_alerts(sector_id: str) -> list[PreAlert]:
         "get_predictive_alerts",
         status="accepted",
         parameters={"sector_id": sector_id},
-        result={"alert_count": len(result)},
+        # Hash the full alert payload, not just a count, so the digest can later
+        # verify exactly what was returned.
+        result=[alert.model_dump(mode="json") for alert in result],
         sector_id=sector_id,
     )
     return result
