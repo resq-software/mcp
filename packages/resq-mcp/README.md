@@ -276,6 +276,16 @@ See [SECURITY.md](./SECURITY.md) for the full control-by-control mapping.
 - **get_deployment_strategy** — Generate an RL-optimized drone deployment and evacuation strategy for a confirmed incident or PDIE pre-alert.
   - Parameters: `incident_id`
 
+### Predictive Intelligence (PDIE)
+
+Both tools are read-only and remain available under Safe Mode.
+
+- **get_vulnerability_map** — Retrieve the precomputed vulnerability assessment for a sector: population density, critical infrastructure, and flood/fire risk scores.
+  - Parameters: `sector_id`
+
+- **get_predictive_alerts** — Generate probabilistic disaster forecasts for a sector. An empty list means no forecast disasters, not a failed lookup; unknown sectors raise instead.
+  - Parameters: `sector_id`
+
 ### Resources
 
 | URI | Description |
