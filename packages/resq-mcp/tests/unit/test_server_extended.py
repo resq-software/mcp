@@ -109,6 +109,53 @@ class TestLifespan:
             async with lifespan(server):
                 pass  # lifespan is running
 
+    @pytest.mark.asyncio
+    async def test_lifespan_flushes_telemetry_on_shutdown(self) -> None:
+        """Buffered spans/metrics must be flushed when the server exits.
+
+        setup_telemetry() runs at import time but nothing called its counterpart,
+        so anything still buffered was dropped on exit. Only observable once a
+        backend is configured (RESQ_TELEMETRY_BACKEND defaults to "none"), which
+        is why it went unnoticed.
+        """
+        server = AsyncMock()
+
+        with (
+            patch("resq_mcp.server.simulation_processor", new_callable=AsyncMock) as mock_proc,
+            patch("resq_mcp.server.shutdown_telemetry") as mock_shutdown,
+        ):
+            mock_proc.return_value = None
+            async with lifespan(server):
+                # Still running: shutdown must not have been called yet.
+                mock_shutdown.assert_not_called()
+
+        mock_shutdown.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_lifespan_flushes_telemetry_after_task_cleanup(self) -> None:
+        """The flush happens last, so shutdown work itself is recorded."""
+        server = AsyncMock()
+        call_order: list[str] = []
+
+        async def fake_processor(_server: object) -> None:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                call_order.append("task_cancelled")
+                raise
+
+        with (
+            patch("resq_mcp.server.simulation_processor", fake_processor),
+            patch(
+                "resq_mcp.server.shutdown_telemetry",
+                side_effect=lambda: call_order.append("flush"),
+            ),
+        ):
+            async with lifespan(server):
+                await asyncio.sleep(0)
+
+        assert call_order == ["task_cancelled", "flush"]
+
 
 class TestDtsopRunSimulationCapacity:
     @pytest.mark.asyncio

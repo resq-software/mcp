@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, Any
 from fastmcp import FastMCP
 
 from resq_mcp.core.config import settings, validate_environment
-from resq_mcp.core.telemetry import setup_telemetry
+from resq_mcp.core.telemetry import setup_telemetry, shutdown_telemetry
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -91,7 +91,8 @@ async def lifespan(server: FastMCP) -> "AsyncGenerator[None, None]":
     Lifecycle:
         1. Startup: Log initialization, create background tasks
         2. Running: Yield control to FastMCP server
-        3. Shutdown: Cancel tasks, suppress CancelledError, log shutdown
+        3. Shutdown: Cancel tasks, suppress CancelledError, log shutdown,
+           then flush telemetry so buffered spans/metrics are not dropped
 
     Args:
         server: The FastMCP server instance for notification dispatch.
@@ -117,6 +118,10 @@ async def lifespan(server: FastMCP) -> "AsyncGenerator[None, None]":
         sim_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await sim_task
+    # Flush buffered spans and metrics last, so shutdown work above is recorded.
+    # No-ops when RESQ_TELEMETRY_BACKEND=none (the default) or the OTel SDK is
+    # absent, and it swallows exporter errors rather than failing shutdown.
+    shutdown_telemetry()
 
 
 # Initialize FastMCP
