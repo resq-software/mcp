@@ -94,7 +94,9 @@ jobs:
         include:
           - name: resq-mcp
             dir: packages/resq-mcp
-            cov: --cov=src --cov-report=xml
+            # --cov-fail-under=85 enforces the project threshold here; pyproject's
+            # addopts sets it to 0 so local and partial runs don't fail on it.
+            cov: --cov=src --cov-report=xml --cov-fail-under=85
           - name: resq-dsa
             dir: packages/resq-dsa
             cov: ""
