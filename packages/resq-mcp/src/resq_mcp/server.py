@@ -248,8 +248,10 @@ async def simulation_processor(server: FastMCP) -> None:
 
 
 # Register tools, resources, and prompts
+import resq_mcp.drone.tools  # noqa: E402
 import resq_mcp.dtsop.tools  # noqa: E402
 import resq_mcp.hce.tools  # noqa: E402
+import resq_mcp.pdie.tools  # noqa: E402
 import resq_mcp.prompts  # noqa: E402
 import resq_mcp.resources  # noqa: F401, E402
 

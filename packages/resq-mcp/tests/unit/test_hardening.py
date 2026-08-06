@@ -37,7 +37,11 @@ def _enable_safe_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class TestSafeModeGate:
-    """run_simulation and update_mission_params must refuse to mutate in Safe Mode."""
+    """Side-effecting tools must refuse to mutate in Safe Mode.
+
+    Covers run_simulation, update_mission_params, and request_drone_deployment.
+    Read-only tools are asserted to remain available in TestSafeModeAllowsReads.
+    """
 
     @pytest.mark.asyncio
     async def test_run_simulation_blocked_in_safe_mode(
@@ -64,6 +68,49 @@ class TestSafeModeGate:
         _enable_safe_mode(monkeypatch)
         with pytest.raises(FastMCPError, match="RESQ_SAFE_MODE"):
             await update_mission_params("DRONE-1", "STRAT-1")
+
+    @pytest.mark.asyncio
+    async def test_request_drone_deployment_blocked_in_safe_mode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Dispatching a drone commands real fleet movement, so Safe Mode refuses it."""
+        from resq_mcp.drone.tools import request_drone_deployment
+
+        _enable_safe_mode(monkeypatch)
+        with pytest.raises(FastMCPError, match="RESQ_SAFE_MODE"):
+            await request_drone_deployment("Sector-1", priority="critical")
+
+
+class TestSafeModeAllowsReads:
+    """Read-only tools must stay available in Safe Mode.
+
+    Safe Mode exists so an agent can *plan* without side effects. If a read tool
+    were ever misclassified as mutating, planning would break entirely -- these
+    assertions catch that.
+    """
+
+    @pytest.mark.asyncio
+    async def test_drone_reads_permitted_in_safe_mode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from resq_mcp.drone.tools import (
+            get_all_sectors_status,
+            get_drone_swarm_status,
+            scan_current_sector,
+        )
+
+        _enable_safe_mode(monkeypatch)
+        assert await scan_current_sector("Sector-1") is not None
+        assert await get_all_sectors_status() is not None
+        assert await get_drone_swarm_status() is not None
+
+    @pytest.mark.asyncio
+    async def test_pdie_reads_permitted_in_safe_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from resq_mcp.pdie.tools import get_predictive_alerts, get_vulnerability_map
+
+        _enable_safe_mode(monkeypatch)
+        assert await get_vulnerability_map("Sector-1") is not None
+        assert await get_predictive_alerts("Sector-1") is not None
 
     @pytest.mark.asyncio
     async def test_run_simulation_succeeds_when_disabled(self) -> None:

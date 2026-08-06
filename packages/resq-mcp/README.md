@@ -243,8 +243,9 @@ resq-mcp is hardened against the concerns in NSA Cybersecurity Information sheet
 See [SECURITY.md](./SECURITY.md) for the full control-by-control mapping.
 
 - **Safe Mode** (`RESQ_SAFE_MODE=true`, default) — side-effecting tools
-  (`run_simulation`, `update_mission_params`) raise a `FastMCPError` so agents can
-  plan missions without real-world consequences. Disable only for autonomous execution.
+  (`run_simulation`, `update_mission_params`, `request_drone_deployment`) raise a
+  `FastMCPError` so agents can plan missions without real-world consequences. Read-only
+  tools stay available. Disable only for autonomous execution.
 - **Authenticated network transports** — bearer-token auth with constant-time
   comparison and zero-downtime rotation (`RESQ_API_KEY_PREVIOUS`); a default token on
   a network listener is refused at startup.
@@ -275,6 +276,28 @@ See [SECURITY.md](./SECURITY.md) for the full control-by-control mapping.
 
 - **get_deployment_strategy** — Generate an RL-optimized drone deployment and evacuation strategy for a confirmed incident or PDIE pre-alert.
   - Parameters: `incident_id`
+
+### Predictive Intelligence (PDIE)
+
+Both tools are read-only and remain available under Safe Mode.
+
+- **get_vulnerability_map** — Retrieve the precomputed vulnerability assessment for a sector: population density, critical infrastructure, and flood/fire risk scores.
+  - Parameters: `sector_id`
+
+- **get_predictive_alerts** — Generate probabilistic disaster forecasts for a sector. An empty list means no forecast disasters, not a failed lookup; unknown sectors raise instead.
+  - Parameters: `sector_id`
+
+### Drone Fleet
+
+- **scan_current_sector** — Run a drone sensor sweep of a sector and return the detected object, confidence, and recommended action. Read-only.
+  - Parameters: `sector_id` (default `"Sector-1"`)
+
+- **get_all_sectors_status** — Mesh-network status across every monitored sector, with per-sector summaries and critical-alert count. Read-only, no parameters.
+
+- **get_drone_swarm_status** — Live fleet telemetry: total/active drone counts, average battery, network status. Read-only, no parameters.
+
+- **request_drone_deployment** — Dispatch a drone to a sector. **Mutating** — refused under Safe Mode.
+  - Parameters: `sector_id`, `priority` (`low` | `medium` | `high` | `critical`, default `high`)
 
 ### Resources
 
