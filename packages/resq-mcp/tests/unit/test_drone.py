@@ -175,3 +175,70 @@ class TestRequestDroneDeployment:
 
         assert isinstance(result, DeploymentStatus)
         assert 30 <= result.eta_seconds <= 120
+
+
+class TestDroneToolWrappers:
+    """Tests for the MCP tool wrappers exposing the drone fleet service."""
+
+    @pytest.mark.asyncio
+    async def test_scan_tool_returns_analysis(self) -> None:
+        from resq_mcp.drone.tools import scan_current_sector as scan_tool
+
+        result = await scan_tool("Sector-1")
+
+        assert isinstance(result, SectorAnalysis)
+
+    @pytest.mark.asyncio
+    async def test_scan_tool_unknown_sector_raises(self) -> None:
+        """Unknown sectors surface as FastMCPError, not an ErrorResponse payload."""
+        from fastmcp.exceptions import FastMCPError
+
+        from resq_mcp.drone.tools import scan_current_sector as scan_tool
+
+        with pytest.raises(FastMCPError):
+            await scan_tool("Sector-999")
+
+    @pytest.mark.asyncio
+    async def test_network_and_swarm_tools_return_models(self) -> None:
+        from resq_mcp.drone.tools import (
+            get_all_sectors_status as network_tool,
+        )
+        from resq_mcp.drone.tools import (
+            get_drone_swarm_status as swarm_tool,
+        )
+
+        assert isinstance(await network_tool(), NetworkStatus)
+        assert isinstance(await swarm_tool(), SwarmStatus)
+
+    @pytest.mark.asyncio
+    async def test_deployment_tool_returns_status(self) -> None:
+        """Safe Mode is disabled by the autouse fixture, so the mutation runs."""
+        from resq_mcp.drone.tools import request_drone_deployment as deploy_tool
+
+        result = await deploy_tool("Sector-1", priority="critical")
+
+        assert isinstance(result, DeploymentStatus)
+        assert result.priority == "critical"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "bad_sector",
+        ["../../etc/passwd", "Sector 1", "bad;semi", "A" * 300],
+        ids=["path-traversal", "space", "semicolon", "over-length"],
+    )
+    async def test_tools_reject_malformed_identifiers(self, bad_sector: str) -> None:
+        """Raw sector_id arguments are checked against the identifier allow-list.
+
+        The drone models carry no identifier field_validator (unlike the HCE
+        models), so preflight() is the only allow-list check in front of the
+        lookup. Both the read and the mutating path must reject the same inputs.
+        """
+        from fastmcp.exceptions import FastMCPError
+
+        from resq_mcp.drone.tools import request_drone_deployment as deploy_tool
+        from resq_mcp.drone.tools import scan_current_sector as scan_tool
+
+        with pytest.raises(FastMCPError):
+            await scan_tool(bad_sector)
+        with pytest.raises(FastMCPError):
+            await deploy_tool(bad_sector)

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import pytest
+from fastmcp.exceptions import FastMCPError
 
 from resq_mcp.core.models import ErrorResponse
 from resq_mcp.pdie.models import PreAlert, VulnerabilityMap
@@ -25,6 +26,8 @@ from resq_mcp.pdie.service import (
     get_predictive_alerts,
     get_vulnerability_map,
 )
+from resq_mcp.pdie.tools import get_predictive_alerts as get_predictive_alerts_tool
+from resq_mcp.pdie.tools import get_vulnerability_map as get_vulnerability_map_tool
 
 
 class TestGetVulnerabilityMap:
@@ -162,3 +165,77 @@ class TestEdgeCases:
                 if isinstance(result, list):
                     for alert in result:
                         assert 0.0 <= alert.probability <= 1.0
+
+
+class TestPdieToolWrappers:
+    """Tests for the MCP tool wrappers exposing the PDIE service."""
+
+    @pytest.mark.asyncio
+    async def test_vulnerability_tool_returns_map(self) -> None:
+        """A known sector returns the VulnerabilityMap unwrapped."""
+        result = await get_vulnerability_map_tool("Sector-1")
+
+        assert isinstance(result, VulnerabilityMap)
+        assert result.sector_id == "Sector-1"
+
+    @pytest.mark.asyncio
+    async def test_vulnerability_tool_unknown_sector_raises(self) -> None:
+        """Unknown sectors surface as FastMCPError, not an ErrorResponse payload."""
+        with pytest.raises(FastMCPError, match="No vulnerability data"):
+            await get_vulnerability_map_tool("Sector-999")
+
+    @pytest.mark.asyncio
+    async def test_alerts_tool_returns_list(self) -> None:
+        """A known sector returns a list of PreAlert (possibly empty)."""
+        result = await get_predictive_alerts_tool("Sector-1")
+
+        assert isinstance(result, list)
+        assert all(isinstance(a, PreAlert) for a in result)
+
+    @pytest.mark.asyncio
+    async def test_alerts_tool_unknown_sector_raises(self) -> None:
+        """Unknown sectors raise rather than returning an empty list.
+
+        An empty list means "no forecast disasters" and must stay distinguishable
+        from "this sector does not exist".
+        """
+        with pytest.raises(FastMCPError):
+            await get_predictive_alerts_tool("Sector-999")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "bad_sector",
+        ["../../etc/passwd", "Sector 1", "bad;semi", "A" * 300],
+        ids=["path-traversal", "space", "semicolon", "over-length"],
+    )
+    async def test_tools_reject_malformed_identifiers(self, bad_sector: str) -> None:
+        """Raw sector_id arguments are checked against the identifier allow-list.
+
+        These tools take a bare string rather than a validated Pydantic model, so
+        preflight() is the only thing standing between user input and a store
+        lookup. Both tools must reject the same inputs.
+        """
+        with pytest.raises(FastMCPError):
+            await get_vulnerability_map_tool(bad_sector)
+        with pytest.raises(FastMCPError):
+            await get_predictive_alerts_tool(bad_sector)
+
+    @pytest.mark.asyncio
+    async def test_reads_are_permitted_under_safe_mode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Safe Mode must not block these tools - they are read-only.
+
+        The conftest fixture disables Safe Mode for every test, so it is
+        re-enabled here explicitly. If either tool were ever marked
+        ``mutating=True`` this would fail, which is the point.
+        """
+        from resq_mcp.core.config import settings
+
+        monkeypatch.setattr(settings, "SAFE_MODE", True)
+
+        vuln = await get_vulnerability_map_tool("Sector-1")
+        alerts = await get_predictive_alerts_tool("Sector-1")
+
+        assert isinstance(vuln, VulnerabilityMap)
+        assert isinstance(alerts, list)
