@@ -2,7 +2,11 @@
 # Trigger - when should this workflow run?
 on:
   pull_request:
-    types: [opened]
+    # `synchronize` and `reopened` are required, not optional: the audit's job
+    # results are recorded against the head SHA. With `opened` alone, pushing any
+    # follow-up commit leaves the new SHA without them, and because these jobs are
+    # required by the branch ruleset the PR becomes permanently unmergeable.
+    types: [opened, synchronize, reopened]
   workflow_dispatch:  # Manual trigger
 
 # Permissions - what can this workflow access?
