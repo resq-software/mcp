@@ -185,6 +185,15 @@ async def update_mission_params(
     )
 
     def _audit_denied(reason: str) -> None:
+        """Emit a denied audit record for this dispatch, tagged with ``reason``.
+
+        Closes over drone_id/strategy_id/is_urgent so each rejection path below
+        records the same parameter set without repeating it.
+
+        Emission is conditional: ``audit_log`` returns without writing when
+        ``RESQ_AUDIT_ENABLED`` is false, so a denial is not guaranteed to leave
+        an audit trail. The rejection itself still takes effect either way.
+        """
         audit_log(
             "update_mission_params",
             status="denied",
