@@ -156,6 +156,31 @@ class TestLifespan:
 
         assert call_order == ["task_cancelled", "flush"]
 
+    @pytest.mark.asyncio
+    async def test_lifespan_flushes_telemetry_even_if_cleanup_raises(self) -> None:
+        """A failing cleanup task must not skip the flush.
+
+        `contextlib.suppress` only swallows CancelledError. If the background
+        task raises anything else, the await propagates and -- without the
+        try/finally -- shutdown_telemetry() would be skipped, dropping exactly
+        the telemetry it exists to save. The original exception must still
+        surface after the flush attempt.
+        """
+        server = AsyncMock()
+
+        async def exploding_processor(_server: object) -> None:
+            raise RuntimeError("processor blew up")
+
+        with (
+            patch("resq_mcp.server.simulation_processor", exploding_processor),
+            patch("resq_mcp.server.shutdown_telemetry") as mock_shutdown,
+            pytest.raises(RuntimeError, match="processor blew up"),
+        ):
+            async with lifespan(server):
+                await asyncio.sleep(0)
+
+        mock_shutdown.assert_called_once()
+
 
 class TestDtsopRunSimulationCapacity:
     @pytest.mark.asyncio

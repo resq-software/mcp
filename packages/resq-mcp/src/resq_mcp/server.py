@@ -109,19 +109,24 @@ async def lifespan(server: FastMCP) -> "AsyncGenerator[None, None]":
     task = asyncio.create_task(simulation_processor(server))
     yield
     logger.info("Shutting down resQ MCP Server...")
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await task
-    # Cancel any in-flight per-simulation tasks so they don't write to the
-    # (now-stale) simulations dict after the processor has stopped.
-    for sim_task in list(_processing_tasks.values()):
-        sim_task.cancel()
+    try:
+        task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
-            await sim_task
-    # Flush buffered spans and metrics last, so shutdown work above is recorded.
-    # No-ops when RESQ_TELEMETRY_BACKEND=none (the default) or the OTel SDK is
-    # absent, and it swallows exporter errors rather than failing shutdown.
-    shutdown_telemetry()
+            await task
+        # Cancel any in-flight per-simulation tasks so they don't write to the
+        # (now-stale) simulations dict after the processor has stopped.
+        for sim_task in list(_processing_tasks.values()):
+            sim_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await sim_task
+    finally:
+        # Flush last, so the shutdown work above is recorded -- and in `finally`
+        # so a task raising something other than CancelledError cannot skip the
+        # flush, which would drop exactly the telemetry this call exists to save.
+        # Any cleanup exception still propagates after the flush attempt.
+        # No-ops when RESQ_TELEMETRY_BACKEND=none (the default) or the OTel SDK
+        # is absent, and it swallows exporter errors rather than failing shutdown.
+        shutdown_telemetry()
 
 
 # Initialize FastMCP
