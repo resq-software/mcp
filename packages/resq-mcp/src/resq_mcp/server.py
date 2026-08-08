@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, Any
 from fastmcp import FastMCP
 
 from resq_mcp.core.config import settings, validate_environment
-from resq_mcp.core.telemetry import setup_telemetry
+from resq_mcp.core.telemetry import setup_telemetry, shutdown_telemetry
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -91,7 +91,8 @@ async def lifespan(server: FastMCP) -> "AsyncGenerator[None, None]":
     Lifecycle:
         1. Startup: Log initialization, create background tasks
         2. Running: Yield control to FastMCP server
-        3. Shutdown: Cancel tasks, suppress CancelledError, log shutdown
+        3. Shutdown: Cancel tasks, suppress CancelledError, log shutdown,
+           then flush telemetry so buffered spans/metrics are not dropped
 
     Args:
         server: The FastMCP server instance for notification dispatch.
@@ -108,15 +109,24 @@ async def lifespan(server: FastMCP) -> "AsyncGenerator[None, None]":
     task = asyncio.create_task(simulation_processor(server))
     yield
     logger.info("Shutting down resQ MCP Server...")
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await task
-    # Cancel any in-flight per-simulation tasks so they don't write to the
-    # (now-stale) simulations dict after the processor has stopped.
-    for sim_task in list(_processing_tasks.values()):
-        sim_task.cancel()
+    try:
+        task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
-            await sim_task
+            await task
+        # Cancel any in-flight per-simulation tasks so they don't write to the
+        # (now-stale) simulations dict after the processor has stopped.
+        for sim_task in list(_processing_tasks.values()):
+            sim_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await sim_task
+    finally:
+        # Flush last, so the shutdown work above is recorded -- and in `finally`
+        # so a task raising something other than CancelledError cannot skip the
+        # flush, which would drop exactly the telemetry this call exists to save.
+        # Any cleanup exception still propagates after the flush attempt.
+        # No-ops when RESQ_TELEMETRY_BACKEND=none (the default) or the OTel SDK
+        # is absent, and it swallows exporter errors rather than failing shutdown.
+        shutdown_telemetry()
 
 
 # Initialize FastMCP
