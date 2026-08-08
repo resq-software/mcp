@@ -88,7 +88,7 @@ async def scan_current_sector(sector_id: str = "Sector-1") -> SectorAnalysis:
         "scan_current_sector",
         status="accepted",
         parameters={"sector_id": sector_id},
-        result={"status": result.status, "disaster_type": result.disaster_type},
+        result=result.model_dump(mode="json"),
         sector_id=sector_id,
     )
     return result
@@ -117,7 +117,7 @@ async def get_all_sectors_status() -> NetworkStatus:
     audit_log(
         "get_all_sectors_status",
         status="accepted",
-        result={"total_sectors": result.total_sectors},
+        result=result.model_dump(mode="json"),
     )
     return result
 
@@ -145,7 +145,7 @@ async def get_drone_swarm_status() -> SwarmStatus:
     audit_log(
         "get_drone_swarm_status",
         status="accepted",
-        result={"active_drones": result.active_drones},
+        result=result.model_dump(mode="json"),
     )
     return result
 
@@ -204,7 +204,9 @@ async def request_drone_deployment(
 
     audit_log(
         "request_drone_deployment",
-        status="accepted",
+        # "dispatched" matches update_mission_params (hce/tools.py), the other
+        # side-effecting dispatch action, rather than the generic "accepted".
+        status="dispatched",
         parameters={"sector_id": sector_id, "priority": priority},
         result=result.model_dump(mode="json"),
         sector_id=sector_id,
