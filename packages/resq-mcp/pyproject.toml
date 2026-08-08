@@ -128,12 +128,11 @@ exclude_lines = [
 ]
 
 [tool.interrogate]
-# Initial fail threshold set just below current measured coverage
-# under the exclusions below (81%) so the gate locks in today's level
-# and forces ratcheting up as docstrings are added. Concentration of
-# misses is in core/telemetry.py (OpenTelemetry helpers); document
-# those next and raise this number.
-fail-under = 75
+# Every definition in src/ under the exclusions below is documented, so the
+# gate is pinned at 100: new undocumented code fails CI rather than silently
+# eroding coverage. Note that ignore-private below excludes dunder names only,
+# not single-underscore helpers -- those need docstrings too.
+fail-under = 100
 ignore-init-module = true
 ignore-init-method = true
 ignore-magic = true
