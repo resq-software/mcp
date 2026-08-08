@@ -108,7 +108,9 @@ disallow_untyped_decorators = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = ["-v", "--tb=short", "--strict-markers"]
+# --cov-fail-under=0 keeps local/partial runs from failing on the project-wide
+# threshold; CI passes --cov-fail-under=85 to enforce it on the full suite.
+addopts = ["-v", "--tb=short", "--strict-markers", "--cov=src", "--cov-fail-under=0"]
 markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
 
 [tool.coverage.run]
@@ -116,6 +118,8 @@ source = ["src/resq_mcp"]
 branch = true
 
 [tool.coverage.report]
+# Applies only to a bare `coverage report`. The pytest path always passes an
+# explicit --cov-fail-under (0 via addopts, 85 in CI), which overrides this.
 fail_under = 85
 exclude_lines = [
   "pragma: no cover",
@@ -165,4 +169,5 @@ dev = [
   "twine>=5.0.0",
   "hypothesis>=6.100.0",
   "aioresponses>=0.7.6",
+  "interrogate>=1.7.0",
 ]
