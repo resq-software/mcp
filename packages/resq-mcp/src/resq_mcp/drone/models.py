@@ -19,9 +19,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from resq_mcp.core.models import Coordinates, _utc_now
+from resq_mcp.core.validation import MAX_IDENTIFIER_LENGTH, validate_identifier
 
 
 class SectorAnalysis(BaseModel):
@@ -44,7 +45,7 @@ class SectorAnalysis(BaseModel):
         recommended_action: Suggested next action (e.g., "IMMEDIATE_REPORT_TO_BLOCKCHAIN").
     """
 
-    sector_id: str
+    sector_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     timestamp: datetime = Field(default_factory=_utc_now)
     status: str
     detected_object: str
@@ -54,6 +55,12 @@ class SectorAnalysis(BaseModel):
     coordinates: Coordinates
     video_proof_url: str | None = None
     recommended_action: str
+
+    @field_validator("sector_id")
+    @classmethod
+    def _validate_identifier_fields(cls, value: str, info: ValidationInfo) -> str:
+        """Reject identifiers outside the allow-list (injection/traversal defense)."""
+        return validate_identifier(value, field=info.field_name or "identifier")
 
 
 class SectorStatusSummary(BaseModel):
@@ -127,8 +134,14 @@ class DeploymentRequest(BaseModel):
                   Higher priority requests preempt lower priority missions.
     """
 
-    sector_id: str
+    sector_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     priority: Literal["low", "medium", "high", "critical"] = "high"
+
+    @field_validator("sector_id")
+    @classmethod
+    def _validate_identifier_fields(cls, value: str, info: ValidationInfo) -> str:
+        """Reject identifiers outside the allow-list (injection/traversal defense)."""
+        return validate_identifier(value, field=info.field_name or "identifier")
 
 
 class DeploymentStatus(BaseModel):
@@ -147,8 +160,14 @@ class DeploymentStatus(BaseModel):
     """
 
     status: str
-    sector_id: str
+    sector_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     priority: str
-    drone_id: str
+    drone_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     eta_seconds: int
     timestamp: datetime = Field(default_factory=_utc_now)
+
+    @field_validator("sector_id", "drone_id")
+    @classmethod
+    def _validate_identifier_fields(cls, value: str, info: ValidationInfo) -> str:
+        """Reject identifiers outside the allow-list (injection/traversal defense)."""
+        return validate_identifier(value, field=info.field_name or "identifier")

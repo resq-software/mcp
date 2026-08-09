@@ -203,3 +203,40 @@ class TestBoundedIdentifierInputs:
             notes="Confirmed via video evidence",
         )
         assert val.incident_id == "INC-1"
+
+
+class TestDroneAndPdieModelIdentifiers:
+    """Drone and PDIE models validate identifiers, matching HCE and DTSOP.
+
+    Previously only the tool wrappers checked these via preflight(), leaving the
+    models themselves as a single point of failure. Validating at both layers
+    means a caller constructing a model directly cannot bypass the allow-list.
+    """
+
+    @pytest.mark.parametrize(
+        "bad",
+        ["../../etc/passwd", "Sector 1", "bad;semi", "A" * 300],
+        ids=["path-traversal", "space", "semicolon", "over-length"],
+    )
+    def test_deployment_request_rejects_bad_sector(self, bad: str) -> None:
+        from resq_mcp.drone.models import DeploymentRequest
+
+        with pytest.raises(ValidationError):
+            DeploymentRequest(sector_id=bad)
+
+    def test_deployment_request_accepts_well_formed(self) -> None:
+        from resq_mcp.drone.models import DeploymentRequest
+
+        assert DeploymentRequest(sector_id="Sector-1").sector_id == "Sector-1"
+
+    def test_vulnerability_map_rejects_bad_sector(self) -> None:
+        from resq_mcp.pdie.models import VulnerabilityMap
+
+        with pytest.raises(ValidationError):
+            VulnerabilityMap(
+                sector_id="../../etc/passwd",
+                population_density="high",
+                critical_infrastructure=[],
+                flood_risk=0.1,
+                fire_risk=0.1,
+            )

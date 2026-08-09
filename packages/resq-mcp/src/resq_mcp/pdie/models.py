@@ -19,9 +19,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from resq_mcp.core.models import _utc_now
+from resq_mcp.core.validation import MAX_IDENTIFIER_LENGTH, validate_identifier
 
 
 class VulnerabilityMap(BaseModel):
@@ -44,11 +45,18 @@ class VulnerabilityMap(BaseModel):
         and infrastructure density. Updated periodically via GIS integration.
     """
 
-    sector_id: str
+    sector_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     population_density: Literal["low", "medium", "high"]
     critical_infrastructure: list[str]
     flood_risk: float = Field(ge=0.0, le=1.0)
     fire_risk: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("sector_id")
+    @classmethod
+    def _validate_identifier_fields(cls, value: str, info: ValidationInfo) -> str:
+        """Reject identifiers outside the allow-list (injection/traversal defense)."""
+        return validate_identifier(value, field=info.field_name or "identifier")
+
     last_updated: datetime = Field(default_factory=_utc_now)
 
 
@@ -79,10 +87,16 @@ class PreAlert(BaseModel):
         ... )
     """
 
-    alert_id: str
-    sector_id: str
+    alert_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
+    sector_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
     predicted_disaster_type: str
     probability: float = Field(ge=0.0, le=1.0)
     forecast_horizon_hours: int = Field(gt=0)
     vulnerability_context: VulnerabilityMap
     generated_at: datetime = Field(default_factory=_utc_now)
+
+    @field_validator("alert_id", "sector_id")
+    @classmethod
+    def _validate_identifier_fields(cls, value: str, info: ValidationInfo) -> str:
+        """Reject identifiers outside the allow-list (injection/traversal defense)."""
+        return validate_identifier(value, field=info.field_name or "identifier")
