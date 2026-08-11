@@ -97,6 +97,12 @@ except ImportError:
     _HAS_OTEL_SDK = False
 
     class _NoOpStatusCode:
+        """Stand-in for ``opentelemetry.trace.StatusCode`` when the SDK is absent.
+
+        Mirrors the three members the tracing helpers reference so span status
+        calls type-check and run without OpenTelemetry installed.
+        """
+
         OK = "OK"
         ERROR = "ERROR"
         UNSET = "UNSET"
@@ -227,10 +233,25 @@ def setup_telemetry() -> None:
 
 
 class _NoOpSpan:
-    def set_attribute(self, _key: str, _value: Any) -> None: ...
-    def set_status(self, _status: Any, _description: str | None = None) -> None: ...
-    def record_exception(self, _exception: BaseException) -> None: ...
-    def end(self) -> None: ...
+    """Span that discards everything written to it.
+
+    Returned by :class:`_NoOpTracer` so instrumented code paths run unchanged
+    when no telemetry backend is configured (``RESQ_TELEMETRY_BACKEND=none``,
+    the default) or the OpenTelemetry SDK is not installed.
+    """
+
+    def set_attribute(self, _key: str, _value: Any) -> None:
+        """Discard an attribute."""
+
+    def set_status(self, _status: Any, _description: str | None = None) -> None:
+        """Discard a status update."""
+
+    def record_exception(self, _exception: BaseException) -> None:
+        """Discard a recorded exception."""
+
+    def end(self) -> None:
+        """End the span; nothing to flush."""
+
     def __enter__(self) -> _NoOpSpan:
         return self
 
@@ -238,34 +259,56 @@ class _NoOpSpan:
 
 
 class _NoOpTracer:
+    """Tracer that hands out :class:`_NoOpSpan` instances."""
+
     def start_as_current_span(self, _name: str, **_kwargs: Any) -> _NoOpSpan:
+        """Return a no-op span usable as a context manager."""
         return _NoOpSpan()
 
     @contextmanager
     def start_span(self, _name: str, **_kwargs: Any) -> Generator[_NoOpSpan]:
+        """Yield a no-op span for the duration of the block."""
         yield _NoOpSpan()
 
 
 class _NoOpMeter:
+    """Meter that hands out discarding instruments."""
+
     def create_counter(self, _name: str, **_kw: Any) -> _NoOpCounter:
+        """Return a counter that discards additions."""
         return _NoOpCounter()
 
     def create_histogram(self, _name: str, **_kw: Any) -> _NoOpHistogram:
+        """Return a histogram that discards recordings."""
         return _NoOpHistogram()
 
     def create_up_down_counter(self, _name: str, **_kw: Any) -> _NoOpCounter:
+        """Return an up-down counter that discards additions."""
         return _NoOpCounter()
 
 
 class _NoOpCounter:
-    def add(self, _amount: int | float, _attributes: dict[str, Any] | None = None) -> None: ...
+    """Counter instrument that discards every addition."""
+
+    def add(self, _amount: int | float, _attributes: dict[str, Any] | None = None) -> None:
+        """Discard a counter increment."""
 
 
 class _NoOpHistogram:
-    def record(self, _amount: int | float, _attributes: dict[str, Any] | None = None) -> None: ...
+    """Histogram instrument that discards every recording."""
+
+    def record(self, _amount: int | float, _attributes: dict[str, Any] | None = None) -> None:
+        """Discard a histogram observation."""
 
 
 class _Metrics:
+    """Lazily-created holder for the server's OpenTelemetry instruments.
+
+    Instruments are built on first access rather than at import time, so
+    :func:`setup_telemetry` can install a real meter before any are created.
+    Falls back to the no-op instruments above when no backend is configured.
+    """
+
     def __init__(self) -> None:
         self._tool_invocations: Any = None
         self._tool_errors: Any = None
@@ -327,6 +370,18 @@ def _apply_trace(
     record_result: bool,
     func: Callable[P, R],
 ) -> Any:
+    """Wrap ``func`` in a span, choosing a sync or async wrapper to match it.
+
+    Args:
+        span_name: Explicit span name, or None to derive ``module.qualname``.
+        record_args: Whether to attach sanitized keyword arguments as attributes.
+        record_result: Whether to attach the (truncated) return value.
+        func: The callable to instrument.
+
+    Returns:
+        A wrapper preserving ``func``'s signature that opens a span, records
+        duration and error metrics, and re-raises any exception unchanged.
+    """
     resolved_name = span_name or f"{func.__module__}.{func.__qualname__}"
     import inspect
 
@@ -334,6 +389,7 @@ def _apply_trace(
 
         @functools.wraps(func)
         async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            """Await the wrapped coroutine inside an active span."""
             with tracer.start_as_current_span(resolved_name) as span_obj:
                 metrics.active_spans.add(1)
                 start = time.monotonic()
@@ -389,6 +445,13 @@ def _set_entry_attrs(
     record_args: bool,
     kwargs: dict[str, Any],
 ) -> None:
+    """Attach call-site attributes to a span as the wrapped function is entered.
+
+    Always records ``code.function`` and ``code.namespace``. Keyword arguments
+    are attached as ``resq.arg.*`` only when ``record_args`` is set, and are
+    sanitized and truncated first so secrets and oversized values do not reach
+    the exporter.
+    """
     span_obj.set_attribute("code.function", func.__qualname__)
     span_obj.set_attribute("code.namespace", func.__module__)
     if record_args and kwargs:
@@ -398,23 +461,61 @@ def _set_entry_attrs(
 
 
 def _set_exit_attrs(span_obj: Any, result: Any, record_result: bool) -> None:
+    """Attach the wrapped function's return value to the span, if requested.
+
+    No-ops when ``record_result`` is false or the result is None. The value is
+    truncated so a large payload cannot bloat the span.
+    """
     if record_result and result is not None:
         span_obj.set_attribute("resq.result", _truncate(result))
 
 
 def _truncate(value: Any, max_len: int = 1024) -> str:
+    """Stringify ``value``, capping it at ``max_len`` characters.
+
+    Args:
+        value: Any object; coerced with ``str()``.
+        max_len: Maximum characters to keep before eliding.
+
+    Returns:
+        str: The string form, suffixed with "..." when it was shortened.
+    """
     s = str(value)
     return s[:max_len] + "..." if len(s) > max_len else s
 
 
 @contextmanager
 def span(name: str, attributes: dict[str, Any] | None = None) -> Generator[Any]:
+    """Open a named span around a block of code.
+
+    Args:
+        name: Span name.
+        attributes: Optional attributes; sanitized before being attached.
+
+    Yields:
+        The active span, or a :class:`_NoOpSpan` when telemetry is disabled.
+
+    Example:
+        >>> with span("mission.plan", {"sector_id": "Sector-1"}):
+        ...     ...
+    """
     safe = _sanitize_attrs(attributes) if attributes else {}
     with tracer.start_as_current_span(name, attributes=safe) as s:
         yield s
 
 
 def log_event(event: str, level: int = logging.INFO, **attrs: Any) -> None:
+    """Emit a structured log record correlated with the active trace.
+
+    Attributes are sanitized and the message redacted before emission, and the
+    current ``trace_id``/``span_id`` are attached when a trace is active so log
+    lines can be joined to spans in the backend.
+
+    Args:
+        event: Event name, used as the log message and the ``event`` field.
+        level: Logging level (default ``logging.INFO``).
+        **attrs: Extra structured fields.
+    """
     safe = _sanitize_attrs(attrs)
     trace_ctx = _get_trace_context()
     extra = {**safe, **trace_ctx, "event": event}
@@ -422,6 +523,12 @@ def log_event(event: str, level: int = logging.INFO, **attrs: Any) -> None:
 
 
 def _get_trace_context() -> dict[str, str]:
+    """Return the active trace and span IDs as hex strings.
+
+    Returns:
+        dict[str, str]: ``{"trace_id": ..., "span_id": ...}`` when a span is
+        active, otherwise an empty dict. Never raises — any SDK error yields {}.
+    """
     if not _HAS_OTEL_SDK:
         return {}
     try:
@@ -437,6 +544,19 @@ def _get_trace_context() -> dict[str, str]:
 
 
 def shutdown_telemetry(timeout_ms: int = 5_000) -> None:
+    """Flush and shut down the tracer and meter providers.
+
+    Call once on server shutdown so buffered spans and metrics are exported
+    rather than dropped. Invoked from the ``lifespan`` exit path in
+    ``server.py``, after background tasks are cancelled.
+
+    Safe to call unconditionally: returns immediately when the OpenTelemetry
+    SDK is absent, and any exporter failure is logged rather than raised, so a
+    misbehaving backend cannot break server shutdown.
+
+    Args:
+        timeout_ms: Milliseconds allowed for the meter provider to flush.
+    """
     if not _HAS_OTEL_SDK:
         return
     try:

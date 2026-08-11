@@ -38,3 +38,6 @@ Thumbs.db
 
 # Session artifacts
 AUDIT_REPORT.md
+
+# Agent working artifacts (PRDs, implementation plans, reports) — local only
+.claude/
