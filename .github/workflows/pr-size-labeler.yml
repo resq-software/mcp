@@ -31,4 +31,11 @@ jobs:
       - uses: pascalgn/size-label-action@56b489b027932ec0cf60438a1a5f1a19c8fc71ff # v0.5.7
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-          IGNORED: ".*\\.lock$|bun\\.lock|\\.lock\\.yml$"
+          # size-label-action parses IGNORED as newline-delimited globrex globs
+          # (extended + globstar), not regex. `**/` is required to match nested
+          # lockfiles in this repo: packages/*/uv.lock and
+          # .github/workflows/*.lock.yml, plus root flake.lock.
+          IGNORED: |
+            **/*.lock
+            bun.lock
+            **/*.lock.yml

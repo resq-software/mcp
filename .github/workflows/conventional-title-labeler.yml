@@ -42,8 +42,38 @@ jobs:
             refactor)     label="C-Refactor" ;;
             test)         label="C-Testing" ;;
             chore|build|ci|style|revert) label="C-Chore" ;;
-            *) echo "Title has no conventional type prefix; nothing to label."; exit 0 ;;
+            *) label="" ;;
           esac
-          echo "Conventional type '$type' -> $label"
-          gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --add-label "$label" \
-            || echo "::warning::label '$label' not found yet (run Label Sync); skipped."
+
+          # Labels currently on the PR: remove only ones actually present (so gh
+          # does not error) and only title-derived ones.
+          mapfile -t current < <(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')
+
+          # Labels this workflow owns exclusively. C-Documentation and C-Testing
+          # are deliberately excluded: .github/labeler.yml also assigns them from
+          # changed paths, so removing them here would fight that path ownership.
+          edit_args=()
+          for owned in C-Feature C-Bug C-Performance C-Refactor C-Chore; do
+            [ "$owned" = "$label" ] && continue
+            for have in ${current[@]+"${current[@]}"}; do
+              if [ "$have" = "$owned" ]; then
+                edit_args+=(--remove-label "$owned")
+                break
+              fi
+            done
+          done
+
+          if [ -n "$label" ]; then
+            edit_args+=(--add-label "$label")
+            echo "Conventional type '$type' -> $label"
+          else
+            echo "Title has no conventional type prefix; clearing stale type labels only."
+          fi
+
+          if [ "${#edit_args[@]}" -eq 0 ]; then
+            echo "No label changes needed."
+            exit 0
+          fi
+
+          gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" "${edit_args[@]}" \
+            || echo "::warning::label edit failed (labels may need Label Sync); skipped."
