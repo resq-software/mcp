@@ -37,6 +37,7 @@ from resq_mcp.core.models import (
 from resq_mcp.drone.models import (
     DeploymentRequest,
     DeploymentStatus,
+    DroneUnit,
     NetworkStatus,
     SectorAnalysis,
     SectorStatusSummary,
@@ -45,6 +46,7 @@ from resq_mcp.drone.models import (
 from resq_mcp.drone.service import (
     get_all_sectors_status,
     get_drone_swarm_status,
+    get_fleet_roster,
     request_drone_deployment,
     scan_current_sector,
 )
@@ -71,6 +73,7 @@ __all__ = [  # noqa: RUF022 - Organized by category for readability
     "ErrorResponse",
     # Models - Drone Feed
     "DisasterScenario",
+    "DroneUnit",
     "SectorAnalysis",
     "SectorStatusSummary",
     "NetworkStatus",
@@ -91,6 +94,7 @@ __all__ = [  # noqa: RUF022 - Organized by category for readability
     "scan_current_sector",
     "get_all_sectors_status",
     "get_drone_swarm_status",
+    "get_fleet_roster",
     "request_drone_deployment",
     # PDIE
     "get_vulnerability_map",

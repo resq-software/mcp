@@ -33,10 +33,20 @@ from typing import Final
 from resq_mcp.core.models import Coordinates, DisasterScenario, ErrorResponse
 from resq_mcp.drone.models import (
     DeploymentStatus,
+    DroneUnit,
     NetworkStatus,
     SectorAnalysis,
     SectorStatusSummary,
     SwarmStatus,
+)
+
+# Fleet composition — the single source of truth for which drones exist.
+# Fleet-wide counts and the resq://drones/active resource both derive from this,
+# so the roster cannot drift out of sync with reported swarm totals.
+FLEET_ROSTER: Final[tuple[DroneUnit, ...]] = (
+    DroneUnit(drone_id="DRONE-Alpha", role="Surveillance", home_sector="Sector-4"),
+    DroneUnit(drone_id="DRONE-Beta", role="Payload", home_sector="Sector-2"),
+    DroneUnit(drone_id="DRONE-Gamma", role="Relay", home_sector="Sector-4"),
 )
 
 # Simulated drone feed database
@@ -197,6 +207,28 @@ def get_all_sectors_status() -> NetworkStatus:
     )
 
 
+def get_fleet_roster() -> tuple[DroneUnit, ...]:
+    """Return the standing fleet roster.
+
+    Fleet composition is static configuration rather than telemetry: it answers
+    "which drones does this deployment own", not "what are they doing right now".
+    Callers that need live metrics should combine this with
+    :func:`get_drone_swarm_status`.
+
+    Returns:
+        tuple[DroneUnit, ...]: Every drone in the fleet, in roster order.
+
+    Example:
+        >>> roster = get_fleet_roster()
+        >>> print(f"{len(roster)} drones: {[u.drone_id for u in roster]}")
+
+    Note:
+        Production would read fleet composition from the drone registry rather
+        than a module-level constant.
+    """
+    return FLEET_ROSTER
+
+
 def get_drone_swarm_status() -> SwarmStatus:
     """Get the overall operational status of the drone swarm.
 
@@ -204,7 +236,7 @@ def get_drone_swarm_status() -> SwarmStatus:
     and availability. Used by operators to assess deployment capacity.
 
     Simulation Behavior:
-        - Total drones: Fixed at 3 for development
+        - Total drones: Derived from FLEET_ROSTER
         - Active drones: Random 2-3 (some may be charging/maintenance)
         - Average battery: Random 60-100% (simulated degradation)
         - Network status: Always "operational" in dev mode
@@ -227,7 +259,7 @@ def get_drone_swarm_status() -> SwarmStatus:
         server, reporting actual battery, GPS lock, and link quality.
     """
     return SwarmStatus(
-        total_drones=3,
+        total_drones=len(FLEET_ROSTER),
         active_drones=random.randint(2, 3),  # noqa: S311
         average_battery=random.randint(60, 100),  # noqa: S311
         network_status="operational",
