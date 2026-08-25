@@ -99,6 +99,30 @@ class NetworkStatus(BaseModel):
     critical_alerts: int
 
 
+class DroneUnit(BaseModel):
+    """Identity and standing assignment of a single drone in the fleet.
+
+    Describes fleet *composition* — the facts about a drone that do not change
+    between telemetry samples. Volatile metrics (battery, link quality, current
+    position) belong to :class:`SwarmStatus` and the live telemetry feed.
+
+    Attributes:
+        drone_id: Unique drone identifier (e.g., "DRONE-Alpha").
+        role: Airframe capability class.
+        home_sector: Sector the drone is normally stationed in.
+    """
+
+    drone_id: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
+    role: Literal["Surveillance", "Payload", "Relay"]
+    home_sector: str = Field(..., min_length=1, max_length=MAX_IDENTIFIER_LENGTH)
+
+    @field_validator("drone_id", "home_sector")
+    @classmethod
+    def _validate_identifier_fields(cls, value: str, info: ValidationInfo) -> str:
+        """Reject identifiers outside the allow-list (injection/traversal defense)."""
+        return validate_identifier(value, field=info.field_name or "identifier")
+
+
 class SwarmStatus(BaseModel):
     """Real-time operational status of the drone swarm.
 

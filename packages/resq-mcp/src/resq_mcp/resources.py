@@ -21,6 +21,7 @@
 
 from fastmcp.exceptions import FastMCPError
 
+from resq_mcp.drone.service import get_drone_swarm_status, get_fleet_roster
 from resq_mcp.server import mcp, simulations
 
 
@@ -101,19 +102,24 @@ def list_active_drones() -> str:
     URI Pattern:
         resq://drones/active
 
+    Composition comes from the drone service's fleet roster and the live metrics
+    come from get_drone_swarm_status(), so this resource and the
+    get_drone_swarm_status tool always report the same fleet.
+
     Returns:
-        str: Formatted string with active drone details:
-            - Drone identifier
-            - Drone type/capability (Surveillance/Payload/Relay)
-            - Operational status (ACTIVE/RETURNING/CHARGING)
-            - Battery percentage
-            - Current sector assignment
+        str: Formatted string with:
+            - One line per drone: identifier, capability, home sector
+            - A fleet summary: active/total counts, average battery,
+              network health, and last ground-station sync
 
     Example Response:
         [Active Fleet Status]
-        - DRONE-Alpha (Surveillance): ACTIVE | Battery 78% | Sector 4
-        - DRONE-Beta (Payload): RETURNING | Battery 12% | Sector 2
-        - DRONE-Gamma (Relay): ACTIVE | Battery 92% | Sector 4
+        - DRONE-Alpha (Surveillance): home Sector-4
+        - DRONE-Beta (Payload): home Sector-2
+        - DRONE-Gamma (Relay): home Sector-4
+
+        Fleet: 3/3 active | average battery 82% | network operational
+        Last sync: 2026-08-25T20:44:01.123456+00:00
 
     Use Cases:
         - Operator dashboard fleet overview
@@ -122,13 +128,23 @@ def list_active_drones() -> str:
         - Sector coverage assessment
 
     Note:
-        Current implementation returns static mock data. Production would
-        query live telemetry from MCP drone feed server and aggregate
-        real-time positions, battery, and mission status.
+        Fleet metrics are still simulated. Production would query live telemetry
+        from the MCP drone feed server for per-drone position, battery, and
+        mission status rather than fleet-level aggregates.
     """
-    return """
+    swarm = get_drone_swarm_status()
+    roster = "\n".join(
+        f"    - {unit.drone_id} ({unit.role}): home {unit.home_sector}"
+        for unit in get_fleet_roster()
+    )
+    summary = (
+        f"    Fleet: {swarm.active_drones}/{swarm.total_drones} active | "
+        f"average battery {swarm.average_battery}% | network {swarm.network_status}"
+    )
+    return f"""
     [Active Fleet Status]
-    - DRONE-Alpha (Surveillance): ACTIVE | Battery 78% | Sector 4
-    - DRONE-Beta (Payload): RETURNING | Battery 12% | Sector 2
-    - DRONE-Gamma (Relay): ACTIVE | Battery 92% | Sector 4
+{roster}
+
+{summary}
+    Last sync: {swarm.last_sync.isoformat()}
     """
