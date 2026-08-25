@@ -43,7 +43,7 @@ class TestGetFleetRoster:
 
     def test_returns_the_module_roster(self) -> None:
         """The accessor exposes FLEET_ROSTER without copying or reordering it."""
-        assert get_fleet_roster() == FLEET_ROSTER
+        assert get_fleet_roster() is FLEET_ROSTER
 
     def test_roster_is_not_empty(self) -> None:
         """A deployment with no drones would make every fleet metric meaningless."""
