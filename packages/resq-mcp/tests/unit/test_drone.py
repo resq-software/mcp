@@ -29,11 +29,36 @@ from resq_mcp.drone.models import (
 )
 from resq_mcp.drone.service import (
     DRONE_SECTORS,
+    FLEET_ROSTER,
     get_all_sectors_status,
     get_drone_swarm_status,
+    get_fleet_roster,
     request_drone_deployment,
     scan_current_sector,
 )
+
+
+class TestGetFleetRoster:
+    """Tests for the get_fleet_roster function."""
+
+    def test_returns_the_module_roster(self) -> None:
+        """The accessor exposes FLEET_ROSTER without copying or reordering it."""
+        assert get_fleet_roster() is FLEET_ROSTER
+
+    def test_roster_is_not_empty(self) -> None:
+        """A deployment with no drones would make every fleet metric meaningless."""
+        assert len(get_fleet_roster()) > 0
+
+    def test_drone_ids_are_unique(self) -> None:
+        """Duplicate IDs would make per-drone telemetry ambiguous."""
+        ids = [unit.drone_id for unit in get_fleet_roster()]
+
+        assert len(ids) == len(set(ids))
+
+    def test_every_home_sector_is_a_monitored_sector(self) -> None:
+        """A drone stationed outside the monitored network could never be tasked."""
+        for unit in get_fleet_roster():
+            assert unit.home_sector in DRONE_SECTORS
 
 
 class TestScanCurrentSector:
@@ -115,6 +140,12 @@ class TestGetDroneSwarmStatus:
         result = get_drone_swarm_status()
 
         assert isinstance(result, SwarmStatus)
+
+    def test_total_drones_tracks_the_fleet_roster(self) -> None:
+        """total_drones is derived from FLEET_ROSTER, not a hardcoded literal."""
+        result = get_drone_swarm_status()
+
+        assert result.total_drones == len(FLEET_ROSTER)
 
     def test_swarm_has_valid_drone_counts(self) -> None:
         """Test that drone counts are valid."""
