@@ -27,13 +27,12 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
+from fleet_api import __version__
 from fleet_api.models import HealthResponse
 from fleet_api.routers import deployments, drones
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-
-__version__ = "0.1.0"
 
 SERVICE_NAME = "fleet-api"
 
