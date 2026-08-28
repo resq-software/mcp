@@ -18,6 +18,8 @@ jobs:
             dir: packages/resq-mcp
           - name: resq-dsa
             dir: packages/resq-dsa
+          - name: fleet-api
+            dir: packages/fleet-api
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,6 +45,8 @@ jobs:
             dir: packages/resq-mcp
           - name: resq-dsa
             dir: packages/resq-dsa
+          - name: fleet-api
+            dir: packages/fleet-api
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -71,6 +75,8 @@ jobs:
             dir: packages/resq-mcp
           - name: resq-dsa
             dir: packages/resq-dsa
+          - name: fleet-api
+            dir: packages/fleet-api
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -89,7 +95,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        name: [resq-mcp, resq-dsa]
+        name: [resq-mcp, resq-dsa, fleet-api]
         python-version: ["3.11", "3.12", "3.13"]
         include:
           - name: resq-mcp
@@ -100,6 +106,9 @@ jobs:
           - name: resq-dsa
             dir: packages/resq-dsa
             cov: ""
+          - name: fleet-api
+            dir: packages/fleet-api
+            cov: --cov=src --cov-report=xml --cov-fail-under=85
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -124,6 +133,8 @@ jobs:
             dir: packages/resq-mcp
           - name: resq-dsa
             dir: packages/resq-dsa
+          - name: fleet-api
+            dir: packages/fleet-api
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
