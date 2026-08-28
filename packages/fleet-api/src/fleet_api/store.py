@@ -64,6 +64,9 @@ _SEED_FLEET: Final[tuple[DroneUnit, ...]] = (
 # A drone below this charge is not eligible for a new mission.
 MIN_DEPLOYABLE_BATTERY: Final[int] = 20
 
+# A deployment in one of these states no longer occupies its drone.
+_TERMINAL_STATUSES: Final[frozenset[str]] = frozenset({"completed", "cancelled"})
+
 # Rough travel-time model: same sector is quick, cross-sector costs more.
 _ETA_SAME_SECTOR_SECONDS: Final[int] = 30
 _ETA_CROSS_SECTOR_SECONDS: Final[int] = 90
@@ -96,7 +99,7 @@ class FleetStore:
             list[DroneUnit]: All known drones. Empty only if the fleet was cleared.
         """
         with self._lock:
-            return [self._drones[key] for key in sorted(self._drones)]
+            return [self._drones[key].model_copy() for key in sorted(self._drones)]
 
     def get_drone(self, drone_id: str) -> DroneUnit | None:
         """Look up a single drone.
@@ -108,7 +111,8 @@ class FleetStore:
             DroneUnit | None: The drone, or ``None`` if no such drone exists.
         """
         with self._lock:
-            return self._drones.get(drone_id)
+            unit = self._drones.get(drone_id)
+            return unit.model_copy() if unit is not None else None
 
     def fleet_status(self) -> FleetStatus:
         """Compute an aggregate snapshot from the current drone records.
@@ -140,67 +144,121 @@ class FleetStore:
             network_status="operational" if active else "degraded",
         )
 
-    def available_drone(self, sector_id: str) -> DroneUnit | None:
-        """Pick the best drone to send to ``sector_id``.
+    def set_active(self, drone_id: str, active: bool) -> None:
+        """Set a drone's operational flag.
 
-        Prefers a drone already stationed in the target sector, then falls back to
-        the most-charged eligible drone elsewhere. A drone is eligible when it is
-        active and charged to at least ``MIN_DEPLOYABLE_BATTERY``.
+        ``is_active`` means "online and airworthy" — it is not a busy flag. A drone
+        flying a mission stays active; engagement is tracked through deployments.
 
         Args:
-            sector_id: The sector the drone needs to reach.
-
-        Returns:
-            DroneUnit | None: The chosen drone, or ``None`` when the fleet has
-            nothing available.
+            drone_id: The drone to update. Unknown identifiers are ignored.
+            active: The new operational state.
         """
         with self._lock:
-            eligible = [
-                unit
-                for unit in self._drones.values()
-                if unit.is_active and unit.battery_percent >= MIN_DEPLOYABLE_BATTERY
-            ]
+            unit = self._drones.get(drone_id)
+            if unit is not None:
+                self._drones[drone_id] = unit.model_copy(update={"is_active": active})
 
-        if not eligible:
-            return None
-
-        # Sort key: local drones first, then highest battery, then stable by id.
-        eligible.sort(
-            key=lambda unit: (unit.home_sector != sector_id, -unit.battery_percent, unit.drone_id)
-        )
-        return eligible[0]
-
-    def create_deployment(
-        self,
-        drone: DroneUnit,
-        sector_id: str,
-        priority: DeploymentPriority,
-    ) -> Deployment:
-        """Record a dispatch of ``drone`` to ``sector_id``.
+    def set_battery(self, drone_id: str, percent: int) -> None:
+        """Set a drone's charge level.
 
         Args:
-            drone: The drone being sent, as returned by :meth:`available_drone`.
-            sector_id: Target sector.
+            drone_id: The drone to update. Unknown identifiers are ignored.
+            percent: New charge, 0-100.
+        """
+        with self._lock:
+            unit = self._drones.get(drone_id)
+            if unit is not None:
+                self._drones[drone_id] = unit.model_copy(update={"battery_percent": percent})
+
+    def _engaged_drone_ids(self) -> set[str]:
+        """Return drones currently flying a non-terminal mission.
+
+        Caller must hold ``self._lock``.
+        """
+        return {
+            record.drone_id
+            for record in self._deployments.values()
+            if record.status not in _TERMINAL_STATUSES
+        }
+
+    def dispatch(
+        self,
+        sector_id: str,
+        priority: DeploymentPriority,
+    ) -> Deployment | None:
+        """Select an eligible drone, engage it, and record the dispatch.
+
+        Selection and recording happen under a single lock, so two concurrent
+        callers can never be handed the same drone. A drone is eligible when it is
+        active, charged to at least ``MIN_DEPLOYABLE_BATTERY``, and not already
+        flying a mission that has yet to reach a terminal state.
+
+        Preference order: a drone already stationed in the target sector, then the
+        most-charged candidate elsewhere, then lowest identifier for stability.
+
+        Args:
+            sector_id: The sector to send a drone to.
             priority: Urgency the mission is filed under.
 
         Returns:
-            Deployment: The stored dispatch record.
+            Deployment | None: The stored dispatch record, or ``None`` when no
+            drone is currently eligible.
         """
-        eta = (
-            _ETA_SAME_SECTOR_SECONDS
-            if drone.home_sector == sector_id
-            else _ETA_CROSS_SECTOR_SECONDS
-        )
-        deployment = Deployment(
-            deployment_id=f"DEP-{uuid.uuid4().hex[:8].upper()}",
-            drone_id=drone.drone_id,
-            sector_id=sector_id,
-            priority=priority,
-            eta_seconds=eta,
-        )
         with self._lock:
+            engaged = self._engaged_drone_ids()
+            eligible = [
+                unit
+                for unit in self._drones.values()
+                if unit.is_active
+                and unit.battery_percent >= MIN_DEPLOYABLE_BATTERY
+                and unit.drone_id not in engaged
+            ]
+            if not eligible:
+                return None
+
+            eligible.sort(
+                key=lambda unit: (
+                    unit.home_sector != sector_id,
+                    -unit.battery_percent,
+                    unit.drone_id,
+                )
+            )
+            drone = eligible[0]
+            eta = (
+                _ETA_SAME_SECTOR_SECONDS
+                if drone.home_sector == sector_id
+                else _ETA_CROSS_SECTOR_SECONDS
+            )
+            deployment = Deployment(
+                deployment_id=f"DEP-{uuid.uuid4().hex[:8].upper()}",
+                drone_id=drone.drone_id,
+                sector_id=sector_id,
+                priority=priority,
+                eta_seconds=eta,
+            )
             self._deployments[deployment.deployment_id] = deployment
-        return deployment
+            return deployment
+
+    def complete_deployment(self, deployment_id: str) -> Deployment | None:
+        """Move a dispatch to ``completed``, releasing its drone for reuse.
+
+        Engagement is derived from deployment status, so completing a mission is
+        what frees the drone — there is no separate busy flag to clear.
+
+        Args:
+            deployment_id: The dispatch to close out.
+
+        Returns:
+            Deployment | None: The updated record, or ``None`` if unknown.
+        """
+        with self._lock:
+            record = self._deployments.get(deployment_id)
+            if record is None:
+                return None
+            updated = record.model_copy(update={"status": "completed"})
+            self._deployments[deployment_id] = updated
+            return updated
 
     def get_deployment(self, deployment_id: str) -> Deployment | None:
         """Look up a single deployment.
