@@ -42,6 +42,9 @@ def create_deployment(request: DeploymentRequest, store: StoreDep) -> Deployment
     Returns:
         Deployment: The dispatch record, with a 201 response.
 
+    A dispatched drone is engaged until its deployment reaches a terminal state,
+    so two calls never return the same ``drone_id`` while both missions are live.
+
     Raises:
         HTTPException: 404 if the sector is not monitored; 409 if no drone is
             currently eligible to fly the mission.
@@ -55,17 +58,18 @@ def create_deployment(request: DeploymentRequest, store: StoreDep) -> Deployment
             ),
         )
 
-    drone = store.available_drone(request.sector_id)
-    if drone is None:
+    deployment = store.dispatch(request.sector_id, request.priority)
+    if deployment is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "No drone is available for dispatch: every drone is inactive or "
-                f"below the {MIN_DEPLOYABLE_BATTERY}% minimum battery."
+                "No drone is available for dispatch: every drone is already flying a "
+                f"mission, inactive, or below the {MIN_DEPLOYABLE_BATTERY}% minimum "
+                "battery."
             ),
         )
 
-    return store.create_deployment(drone, request.sector_id, request.priority)
+    return deployment
 
 
 @router.get("", response_model=list[Deployment], summary="List dispatch records")

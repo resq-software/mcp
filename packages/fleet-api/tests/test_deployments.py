@@ -84,7 +84,7 @@ class TestCreateDeployment:
 
     def test_no_eligible_drone_returns_409(self, client: TestClient, store: FleetStore) -> None:
         for drone in store.list_drones():
-            drone.is_active = False
+            store.set_active(drone.drone_id, False)
 
         response = client.post("/deployments", json={"sector_id": "Sector-1"})
 
@@ -95,9 +95,72 @@ class TestCreateDeployment:
         self, client: TestClient, store: FleetStore
     ) -> None:
         for drone in store.list_drones():
-            drone.battery_percent = 5
+            store.set_battery(drone.drone_id, 5)
 
         assert client.post("/deployments", json={"sector_id": "Sector-1"}).status_code == 409
+
+    def test_two_dispatches_use_different_drones(self, client: TestClient) -> None:
+        """A drone flying a mission must not be handed out again."""
+        first = client.post("/deployments", json={"sector_id": "Sector-1"}).json()
+        second = client.post("/deployments", json={"sector_id": "Sector-1"}).json()
+
+        assert first["drone_id"] != second["drone_id"]
+
+    def test_fleet_is_exhausted_once_every_drone_is_engaged(
+        self, client: TestClient, store: FleetStore
+    ) -> None:
+        """The 409 is reachable through the API, not only by editing the store."""
+        for _ in range(len(store.list_drones())):
+            assert client.post("/deployments", json={"sector_id": "Sector-1"}).status_code == 201
+
+        response = client.post("/deployments", json={"sector_id": "Sector-1"})
+
+        assert response.status_code == 409
+        assert "already flying a mission" in response.json()["detail"]
+
+    def test_completing_a_mission_frees_its_drone(
+        self, client: TestClient, store: FleetStore
+    ) -> None:
+        """Engagement is derived from deployment status, not a permanent flag."""
+        first = client.post("/deployments", json={"sector_id": "Sector-1"}).json()
+        for _ in range(len(store.list_drones()) - 1):
+            client.post("/deployments", json={"sector_id": "Sector-1"})
+        assert client.post("/deployments", json={"sector_id": "Sector-1"}).status_code == 409
+
+        assert store.complete_deployment(first["deployment_id"]) is not None
+
+        reused = client.post("/deployments", json={"sector_id": "Sector-1"})
+        assert reused.status_code == 201
+        assert reused.json()["drone_id"] == first["drone_id"]
+
+
+class TestCompleteDeployment:
+    def test_completing_an_unknown_deployment_returns_none(self, store: FleetStore) -> None:
+        assert store.complete_deployment("DEP-NOPE") is None
+
+
+class TestStoreEncapsulation:
+    def test_reads_return_copies_not_live_records(self, store: FleetStore) -> None:
+        """Mutating a returned drone must not reach into the store.
+
+        Guards the regression this PR fixed: reads used to hand out the stored
+        object, so a caller could corrupt fleet state outside the lock.
+        """
+        handed_out = store.get_drone("DRONE-Alpha")
+        assert handed_out is not None
+        handed_out.battery_percent = 1
+        handed_out.is_active = False
+
+        stored = store.get_drone("DRONE-Alpha")
+        assert stored is not None
+        assert stored.battery_percent == 78
+        assert stored.is_active is True
+
+    def test_list_drones_returns_copies(self, store: FleetStore) -> None:
+        for drone in store.list_drones():
+            drone.battery_percent = 1
+
+        assert all(unit.battery_percent != 1 for unit in store.list_drones())
 
 
 class TestReadDeployments:

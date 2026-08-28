@@ -97,9 +97,7 @@ class TestFleetStatus:
         """The aggregate is computed live, not cached at seed time."""
         before = client.get("/fleet/status").json()["active_drones"]
 
-        drone = store.get_drone("DRONE-Beta")
-        assert drone is not None
-        drone.is_active = False
+        store.set_active("DRONE-Beta", False)
 
         after = client.get("/fleet/status").json()["active_drones"]
         assert after == before - 1
@@ -108,6 +106,6 @@ class TestFleetStatus:
         self, client: TestClient, store: FleetStore
     ) -> None:
         for drone in store.list_drones():
-            drone.is_active = False
+            store.set_active(drone.drone_id, False)
 
         assert client.get("/fleet/status").json()["network_status"] == "degraded"
