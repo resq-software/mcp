@@ -13,7 +13,7 @@
 # limitations under the License.
 
 {
-  description = "ResQ Python workspace — resq-mcp (FastMCP server), resq-dsa (zero-dependency algorithms), fleet-api (internal service)";
+  description = "ResQ Python workspace — resq-mcp (FastMCP server) and resq-dsa (zero-dependency algorithms)";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
@@ -59,7 +59,7 @@
 
             echo ""
             echo "Setup:  uv sync"
-            echo "Packages: packages/{resq-mcp,resq-dsa,fleet-api}"
+            echo "Packages: packages/{resq-mcp,resq-dsa}"
             echo "Dev:    cd packages/<pkg> && uv run <entrypoint>"
             echo "Test:   uv run pytest"
             echo "Lint:   uv run ruff check . && uv run mypy src/"

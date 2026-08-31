@@ -11,7 +11,6 @@ Python packages for the [ResQ](https://github.com/resq-software) disaster respon
 |---------|-------------|---------|
 | [`resq-mcp`](packages/resq-mcp/) | FastMCP server -- connects AI agents to drone fleet, simulations, and disaster intelligence | [![PyPI](https://img.shields.io/pypi/v/resq-mcp?style=flat-square)](https://pypi.org/project/resq-mcp/) |
 | [`resq-dsa`](packages/resq-dsa/) | Zero-dependency data structures & algorithms for search, rescue, and geospatial ops | [![PyPI](https://img.shields.io/pypi/v/resq-dsa?style=flat-square)](https://pypi.org/project/resq-dsa/) |
-| [`fleet-api`](packages/fleet-api/) | FastAPI service for fleet state and sector deployments | *Not published — internal service* |
 
 ## Architecture
 
@@ -42,11 +41,6 @@ graph TB
             DSA --> HP
             DSA --> TR
         end
-        subgraph "packages/fleet-api"
-            API[fleet-api<br/><i>FastAPI Service</i>]
-            STORE[FleetStore<br/>Dispatch & Reservation]
-            API --> STORE
-        end
     end
 
     AI[AI Clients<br/>Claude / VS Code / Cursor] -->|MCP protocol| MCP
@@ -71,7 +65,6 @@ git clone https://github.com/resq-software/pypi.git && cd pypi
 # Work on a package
 cd packages/resq-mcp && uv sync && uv run pytest
 cd packages/resq-dsa && uv sync && uv run pytest
-cd packages/fleet-api && uv sync && uv run pytest
 ```
 
 ### Release Flow
@@ -86,7 +79,7 @@ graph LR
     PYPI --> DOCKER[Docker Image<br/><i>resq-mcp only</i>]
 ```
 
-The two published packages use [python-semantic-release](https://python-semantic-release.readthedocs.io/) with [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) OIDC. Conventional commits determine the version bump, but **releases are triggered manually** from the Actions tab — the branch ruleset rejects the bot's version commit, so the workflow is `workflow_dispatch` only. `fleet-api` has no publish lane.
+The two published packages use [python-semantic-release](https://python-semantic-release.readthedocs.io/) with [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) OIDC. Conventional commits determine the version bump, but **releases are triggered manually** from the Actions tab — the branch ruleset rejects the bot's version commit, so the workflow is `workflow_dispatch` only.
 
 ## License
 
