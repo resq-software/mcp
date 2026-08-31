@@ -23,6 +23,11 @@ readme = "README.md"
 authors = [{ name = "ResQ Team" }]
 keywords = ["fastapi", "drone", "disaster-response", "resq"]
 classifiers = [
+  # Internal service, not a published distribution. PyPI rejects any upload
+  # carrying this classifier, so an accidental `uv publish` fails closed
+  # rather than claiming the generic `fleet-api` name. Delete this line (and
+  # add a publish lane) if this is ever released.
+  "Private :: Do Not Upload",
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
