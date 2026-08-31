@@ -9,7 +9,7 @@ Registry workspace for ResQ Python packages published to PyPI.
 - Package Manager: uv
 - Testing: pytest (+ hypothesis for property-based tests in resq-mcp)
 - Linting: ruff + mypy (strict)
-- Release: python-semantic-release (resq-mcp), version-check (resq-dsa). Triggered manually via
+- Release: python-semantic-release for both published packages. Triggered manually via
   `workflow_dispatch` — the branch ruleset rejects the release commit, so pushes do not publish.
 
 ## Repo Map
