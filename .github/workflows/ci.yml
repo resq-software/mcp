@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.13"
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --locked
         working-directory: ${{ matrix.dir }}
       - run: uv run ruff check src/ tests/
         working-directory: ${{ matrix.dir }}
@@ -55,7 +55,7 @@ jobs:
         with:
           python-version: "3.13"
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --locked
         working-directory: ${{ matrix.dir }}
       - run: uv run mypy src/
         working-directory: ${{ matrix.dir }}
@@ -117,7 +117,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --locked
         working-directory: ${{ matrix.dir }}
       - run: uv run pytest tests/ -v ${{ matrix.cov }}
         working-directory: ${{ matrix.dir }}
