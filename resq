@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2026 ResQ
 #
@@ -14,5 +14,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
-source "$ROOT_DIR/resq" "$@"
+# Shim. The real CLI is the `resq` binary installed by resq-software/dev
+# (see bootstrap.sh); this forwards to it so `./resq <cmd>` works from the
+# repo regardless of PATH ordering.
+#
+# The previous version resolved the repo root and sourced "$ROOT_DIR/resq" --
+# itself -- so every invocation recursed until killed. Resolve the target by
+# real path and skip this file explicitly.
+
+set -euo pipefail
+
+self=$(readlink -f "${BASH_SOURCE[0]}")
+
+target=""
+while IFS= read -r candidate; do
+  [ -x "$candidate" ] || continue
+  [ "$(readlink -f "$candidate")" = "$self" ] && continue
+  target=$candidate
+  break
+done < <(type -a -P resq 2>/dev/null || true)
+
+if [ -z "$target" ]; then
+  cat >&2 <<'MSG'
+resq: the ResQ CLI is not installed or is not on PATH.
+
+Install it with the repo bootstrap:
+
+    ./bootstrap.sh
+
+See https://github.com/resq-software/dev for the installer.
+MSG
+  exit 127
+fi
+
+exec "$target" "$@"
