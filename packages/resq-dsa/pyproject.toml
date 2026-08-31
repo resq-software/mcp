@@ -7,13 +7,13 @@ name = "resq-dsa"
 version = "1.3.4"
 description = "Production-grade data structures and algorithms — zero dependencies"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 readme = "README.md"
 authors = [{ name = "ResQ Software" }]
 keywords = ["dsa", "bloom-filter", "graph", "trie", "algorithms"]
 classifiers = [
   "Development Status :: 3 - Alpha",
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",

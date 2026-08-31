@@ -17,14 +17,14 @@ name = "resq-mcp"
 version = "1.3.3"
 description = "FastMCP server exposing ResQ platform capabilities to AI clients"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 readme = "README.md"
 authors = [{ name = "ResQ Team" }]
 keywords = ["mcp", "drone", "disaster-response", "fastmcp", "resq"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -61,7 +61,7 @@ dependencies = [
 
 [project.urls]
 Repository = "https://github.com/resq-software/pypi"
-Changelog = "https://github.com/resq-software/pypi/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/resq-software/pypi/blob/main/packages/resq-mcp/CHANGELOG.md"
 Issues = "https://github.com/resq-software/pypi/issues"
 
 [project.scripts]
