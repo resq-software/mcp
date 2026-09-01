@@ -15,7 +15,6 @@ Registry workspace for ResQ Python packages published to PyPI.
 ## Repo Map
 - `packages/resq-mcp/` — FastMCP server for AI agent integration (drone fleet, PDIE, DTSOP)
 - `packages/resq-dsa/` — Zero-dependency data structures & algorithms (Bloom, CountMin, Graph, Heap, Trie, Rabin-Karp)
-- `packages/fleet-api/` — FastAPI service for fleet state and sector deployments. Not published; no release lane.
 
 ## Commands
 ```bash
@@ -26,10 +25,6 @@ uv run mypy src/
 
 # resq-dsa
 cd packages/resq-dsa && uv sync && uv run pytest
-uv run ruff check src/ tests/
-
-# fleet-api
-cd packages/fleet-api && uv sync && uv run pytest
 uv run ruff check src/ tests/
 ```
 
